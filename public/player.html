@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0b1020" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>Своя игра — телефон игрока</title>
+    <link rel="stylesheet" href="/css/base.css?v=20261026-1" />
+    <link rel="stylesheet" href="/css/player.css?v=20261026-1" />
+  </head>
+  <body class="player-page">
+    <div class="player-glow player-glow--one"></div>
+    <div class="player-glow player-glow--two"></div>
+
+    <div class="player-shell">
+      <!-- Вход в игру -->
+      <section class="join-view" id="joinView">
+        <div class="join-brand">
+          <div class="join-logo">С</div>
+          <div>
+            <div class="join-brand-title">СВОЯ ИГРА</div>
+            <div class="branding-tagline join-brand-tagline">ЯЧЕЙКА 9.11</div>
+            <div class="join-brand-sub">Телефон игрока</div>
+          </div>
+        </div>
+
+        <div class="join-card">
+          <div class="join-head">
+            <span class="join-eyebrow">Подключение к игре</span>
+            <h1>Займите место<br />в команде</h1>
+            <p>Введите имя, выберите существующую команду или создайте новую.</p>
+          </div>
+
+          <label class="join-field">
+            <span>Ваше имя</span>
+            <input
+              id="playerName"
+              type="text"
+              maxlength="24"
+              autocomplete="name"
+              placeholder="Например, Алексей"
+              enterkeyhint="next"
+            />
+          </label>
+
+          <div class="join-team-section">
+            <div class="join-field-label">
+              <span>Команда</span>
+              <small id="teamCountLabel">0 команд</small>
+            </div>
+            <div class="team-choice-list" id="teamChoices">
+              <div class="team-choice-empty">Загружаем команды…</div>
+            </div>
+          </div>
+
+          <div class="create-team-box">
+            <label class="join-field join-field--compact">
+              <span>Или создайте новую</span>
+              <input
+                id="newTeamName"
+                type="text"
+                maxlength="24"
+                autocomplete="off"
+                placeholder="Название команды"
+                enterkeyhint="done"
+              />
+            </label>
+            <p class="join-hint">Название можно оставить пустым, если выбрали команду выше.</p>
+          </div>
+
+          <button class="join-submit" id="joinSubmit" type="button">
+            Войти в игру
+            <span>→</span>
+          </button>
+
+          <div class="join-error hidden" id="joinError" role="alert"></div>
+          <div class="join-started hidden" id="joinStarted">
+            <strong>Игра уже началась</strong>
+            <span>Попросите ведущего нажать «Новая игра», чтобы подключиться.</span>
+          </div>
+        </div>
+
+        <div class="join-footer">
+          <span class="conn" id="joinConnection">Подключение</span>
+          <span>Телефон и компьютер ведущего — в одной Wi-Fi сети</span>
+        </div>
+      </section>
+
+      <!-- Игра -->
+      <section class="game-view hidden" id="gameView">
+        <header class="player-header">
+          <div class="player-team-avatar" id="teamAvatar">?</div>
+          <div class="player-team-copy">
+            <strong id="myTeamName">Команда</strong>
+            <span id="myTeamMeta">0 игроков</span>
+          </div>
+          <div class="player-score">
+            <span>Счёт</span>
+            <strong id="myScore">0</strong>
+          </div>
+        </header>
+
+        <div class="player-phasebar">
+          <span class="player-phase" id="playerPhase">Лобби</span>
+          <span class="player-round" id="playerRound">Раунд 1</span>
+        </div>
+
+        <main class="player-main" id="playerMain"></main>
+
+        <footer class="player-footer">
+          <span class="conn" id="playerConnection">На связи</span>
+          <span id="playerFooterNote">Создано при поддержке "Ячейка 9.11"</span>
+        </footer>
+      </section>
+    </div>
+
+    <div class="offline-overlay hidden" id="offlineOverlay">
+      <div class="offline-card">
+        <div class="offline-spinner"></div>
+        <h2>Связь потеряна</h2>
+        <p>Переподключаемся к игре. Не закрывайте страницу.</p>
+      </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/common.js?v=20261026-1"></script>
+    <script src="/js/player.js?v=20261026-1"></script>
+  </body>
+</html>

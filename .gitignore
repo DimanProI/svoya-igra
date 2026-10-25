@@ -1,0 +1,12 @@
+node_modules/
+.npm-cache/
+.edge-profile*/
+.edge-stderr.log
+.edge-stdout.log
+test/screenshots/
+test/.smoke-custom-games.json
+data/custom-games.json
+data/custom-games.json.tmp
+*.log
+.DS_Store
+Thumbs.db

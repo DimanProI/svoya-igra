@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b1020" />
+    <title>Своя игра — редактор игры</title>
+    <link rel="stylesheet" href="/css/base.css?v=20261026-1" />
+    <link rel="stylesheet" href="/css/editor.css?v=20261026-1" />
+  </head>
+  <body class="editor-page">
+    <div class="editor-glow editor-glow--one"></div>
+    <div class="editor-glow editor-glow--two"></div>
+
+    <div class="editor-shell is-locked" id="editorShell">
+      <header class="editor-topbar">
+        <div class="editor-brand">
+          <div class="editor-logo">✎</div>
+          <div>
+            <div class="editor-title">Редактор игры</div>
+            <div class="branding-tagline editor-brand-tagline">ЯЧЕЙКА 9.11</div>
+            <div class="editor-subtitle" id="editorSubtitle">Своя игра · конструктор</div>
+          </div>
+        </div>
+
+        <div class="editor-top-status">
+          <span class="editor-badge">Конструктор</span>
+          <span class="conn" id="editorConnection">На связи</span>
+        </div>
+
+        <div class="editor-top-actions">
+          <a class="editor-link" href="/host" target="_blank" rel="noopener">Пульт ↗</a>
+          <a class="editor-link" href="/screen" target="_blank" rel="noopener">Экран ↗</a>
+          <button class="editor-small-btn" type="button" data-action="logout">Выйти</button>
+        </div>
+      </header>
+
+      <main class="editor-main">
+        <aside class="editor-sidebar">
+          <section class="editor-panel editor-meta-panel">
+            <div class="editor-panel-head">
+              <span class="editor-label">Паспорт игры</span>
+              <h2>Настройки набора</h2>
+            </div>
+
+            <label class="editor-field">
+              <span>Название игры</span>
+              <input
+                type="text"
+                id="gameName"
+                maxlength="100"
+                placeholder="Например, Пятничный турнир"
+              />
+            </label>
+
+            <label class="editor-field">
+              <span>Описание</span>
+              <textarea
+                id="gameDescription"
+                rows="2"
+                maxlength="500"
+                placeholder="Короткая подпись для ведущего"
+              ></textarea>
+            </label>
+
+            <div class="editor-count-grid" id="editorCountGrid">
+              <div><strong id="categoryCount">0</strong><span>категорий</span></div>
+              <div><strong id="questionCount">0</strong><span>вопросов</span></div>
+              <div><strong id="imageCount">0</strong><span>изображений</span></div>
+            </div>
+
+            <div class="editor-button-stack">
+              <button class="editor-btn editor-btn--primary" type="button" data-action="save-game" id="saveGameBtn">
+                Сохранить в игру
+              </button>
+              <div class="editor-button-row">
+                <button class="editor-btn" type="button" data-action="export-game">Скачать JSON</button>
+                <button class="editor-btn" type="button" data-action="import-game">Загрузить JSON</button>
+              </div>
+              <button class="editor-btn editor-btn--ghost" type="button" data-action="new-draft">
+                Новый чистый набор
+              </button>
+            </div>
+            <div class="editor-save-status" id="saveStatus">
+              <span class="save-dot"></span>
+              <span id="saveStatusText">Черновик не сохранён</span>
+            </div>
+          </section>
+
+          <section class="editor-panel saved-panel">
+            <div class="editor-panel-head">
+              <span class="editor-label">Библиотека</span>
+              <h2>Сохранённые игры</h2>
+            </div>
+            <div class="saved-games" id="savedGames">
+              <div class="saved-empty">Загружаем библиотеку…</div>
+            </div>
+          </section>
+
+          <section class="editor-help">
+            <strong>Как это работает</strong>
+            <p>Создайте категории и любое количество вопросов. Изображение можно прикрепить к каждому вопросу.</p>
+            <p>Сохраните набор — он появится в лобби на пульте ведущего. JSON-файл можно передать на другой компьютер и импортировать там.</p>
+          </section>
+        </aside>
+
+        <section class="editor-workspace">
+          <div class="workspace-head">
+            <div>
+              <span class="editor-label">Игровое поле</span>
+              <h1 id="workspaceTitle">Новая игра</h1>
+              <p>Добавляйте категории, вопросы и изображения. В одном наборе может быть сколько угодно вопросов.</p>
+            </div>
+            <div class="workspace-actions">
+              <button class="editor-btn editor-btn--accent" type="button" data-action="add-category">
+                + Категория
+              </button>
+            </div>
+          </div>
+
+          <div class="categories" id="categories"></div>
+
+          <button class="add-category-wide" type="button" data-action="add-category">
+            <span>+</span>
+            Добавить категорию
+          </button>
+        </section>
+      </main>
+    </div>
+
+    <input type="file" id="imageFileInput" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+    <input type="file" id="gameFileInput" accept=".json,application/json" hidden />
+
+    <div class="confirm-overlay hidden" id="editorConfirm">
+      <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="editorConfirmTitle">
+        <div class="confirm-icon">!</div>
+        <span class="editor-label">Подтверждение</span>
+        <h2 id="editorConfirmTitle">Удалить?</h2>
+        <p id="editorConfirmText">Действие нельзя отменить.</p>
+        <div class="confirm-actions">
+          <button class="editor-btn editor-btn--ghost" type="button" data-action="confirm-cancel">
+            Отмена
+          </button>
+          <button class="editor-btn editor-btn--danger" type="button" data-action="confirm-accept">
+            Удалить
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="auth-overlay" id="editorAuth">
+      <form class="auth-card" id="editorAuthForm">
+        <div class="auth-icon">✎</div>
+        <span class="auth-eyebrow">Защищённая зона</span>
+        <h1>Редактор игр</h1>
+        <div class="branding-tagline auth-brand-tagline">ЯЧЕЙКА 9.11</div>
+        <p>Введите пароль ведущего. Он открывает пульт и создание игровых наборов.</p>
+        <label class="auth-field">
+          <span>Пароль</span>
+          <input
+            type="password"
+            id="editorPassword"
+            autocomplete="current-password"
+            placeholder="••••••••"
+            required
+          />
+        </label>
+        <div class="auth-error hidden" id="editorAuthError" role="alert"></div>
+        <button class="auth-submit" id="editorAuthSubmit" type="submit">Войти</button>
+        <span class="conn is-offline" id="editorAuthConnection">Подключение</span>
+      </form>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/common.js?v=20261026-1"></script>
+    <script src="/js/editor.js?v=20261026-1"></script>
+  </body>
+</html>

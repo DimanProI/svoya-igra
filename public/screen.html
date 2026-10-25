@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#080b16" />
+    <title>Своя игра — экран показа</title>
+    <link rel="stylesheet" href="/css/base.css?v=20261026-1" />
+    <link rel="stylesheet" href="/css/screen.css?v=20261026-1" />
+  </head>
+  <body class="screen-page">
+    <div class="ambient ambient--one"></div>
+    <div class="ambient ambient--two"></div>
+    <div class="ambient ambient--three"></div>
+
+    <div class="screen-layout">
+      <header class="screen-header">
+        <div class="brand-block">
+          <div class="brand-mark">С</div>
+          <div class="brand-copy">
+            <div class="brand-title">СВОЯ ИГРА</div>
+            <div class="branding-tagline screen-brand-tagline">ЯЧЕЙКА 9.11</div>
+            <div class="brand-sub" id="roundLabel">Клубный турнир</div>
+          </div>
+        </div>
+
+        <div class="header-center">
+          <div class="phase-badge" id="phaseBadge">Лобби</div>
+          <div class="selector-banner hidden" id="selectorBanner">
+            <span>Выбирает</span>
+            <strong id="selectorName">—</strong>
+          </div>
+        </div>
+
+        <div class="header-right">
+          <div class="header-timer hidden" id="headerTimer">
+            <span id="headerTimerValue">60</span>
+            <small id="headerTimerLabel">сек</small>
+          </div>
+          <button class="sound-toggle" id="soundToggle" type="button" title="Звуковые эффекты">
+            <span id="soundIcon">🔇</span>
+            <span id="soundLabel">Звук</span>
+          </button>
+          <span class="conn" id="connection">На связи</span>
+        </div>
+      </header>
+
+      <main class="screen-main">
+        <!-- Лобби -->
+        <section class="view lobby-view" id="lobbyView">
+          <div class="lobby-hero">
+            <div class="lobby-copy">
+              <span class="eyebrow">Подключение по Wi-Fi</span>
+              <h1>Соберите команду<br /><em>и играйте</em></h1>
+              <p class="lobby-lead">
+                Отсканируйте QR-код телефоном или откройте адрес в браузере.
+                Введите имя, выберите команду — и занимайте место за большим экраном.
+              </p>
+              <div class="join-url-card">
+                <span>Адрес для телефонов</span>
+                <strong id="joinUrl">—</strong>
+                <small>Телефон и компьютер должны быть в одной Wi-Fi сети</small>
+              </div>
+              <div class="ip-list" id="ipList"></div>
+            </div>
+
+            <div class="qr-side">
+              <div class="qr-glow"></div>
+              <div class="qr-frame">
+                <img id="qrImage" alt="QR-код для подключения к игре" />
+                <div class="qr-placeholder" id="qrPlaceholder">QR</div>
+              </div>
+              <div class="qr-caption">
+                <span class="live-dot"></span>
+                Сканируйте камерой телефона
+              </div>
+              <div class="qr-subcaption">Не нужны приложения и регистрация</div>
+            </div>
+          </div>
+
+          <div class="lobby-bottom">
+            <div class="lobby-teams-panel">
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow">Состав игры</span>
+                  <h2>Команды в лобби</h2>
+                </div>
+                <div class="player-counter">
+                  <strong id="lobbyPlayerCount">0</strong>
+                  <span id="lobbyPlayerLabel">игроков</span>
+                </div>
+              </div>
+              <div class="lobby-team-grid" id="lobbyTeamGrid"></div>
+            </div>
+
+            <div class="waiting-card">
+              <div class="waiting-orbit">
+                <span></span><span></span><span></span>
+              </div>
+              <h3>Ждём ведущего</h3>
+              <p>Игра начнётся, как только на пульте нажмут «Начать игру».</p>
+              <div class="waiting-note">
+                <span class="live-dot"></span>
+                Подключайтесь — экран обновляется автоматически
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Игровое поле -->
+        <section class="view game-view hidden" id="gameView">
+          <div class="board-area">
+            <div class="board-head">
+              <div class="board-title-block">
+                <span class="eyebrow" id="roundEyebrow">Раунд 1</span>
+                <h2 id="roundTitle">География</h2>
+              </div>
+              <div class="board-meta">
+                <span class="board-meta-item">
+                  <strong id="remainingCount">25</strong>
+                  вопросов осталось
+                </span>
+                <span class="board-meta-divider"></span>
+                <span class="board-meta-item" id="boardSelectorMeta">Ход команды —</span>
+              </div>
+            </div>
+            <div class="board" id="gameBoard"></div>
+            <div class="board-notice hidden" id="boardNotice">
+              <span class="notice-pulse"></span>
+              <span id="boardNoticeText">Вопрос выбран — ведущий сейчас откроет его</span>
+            </div>
+          </div>
+
+          <aside class="score-panel">
+            <div class="score-panel-head">
+              <div>
+                <span class="eyebrow">Табло</span>
+                <h2>Команды</h2>
+              </div>
+              <span class="online-players" id="onlinePlayers">0 онлайн</span>
+            </div>
+            <div class="score-list" id="scoreList"></div>
+            <div class="score-panel-foot">
+              <div class="score-foot-row">
+                <span>Раунд</span>
+                <strong id="scoreRound">1 / 2</strong>
+              </div>
+              <div class="score-foot-row">
+                <span>Всего вопросов</span>
+                <strong id="totalQuestions">25</strong>
+              </div>
+              <div class="score-tip">Кнопку ответа нажимают на телефоне</div>
+            </div>
+          </aside>
+        </section>
+
+        <!-- Финал / конец раунда -->
+        <section class="view finish-view hidden" id="finishView">
+          <div class="finish-header">
+            <div class="finish-crown" id="finishCrown">🏆</div>
+            <span class="eyebrow" id="finishEyebrow">Финал</span>
+            <h1 id="finishTitle">Победитель</h1>
+            <p id="finishSubtitle">Итоговая таблица</p>
+          </div>
+
+          <div class="podium" id="podium"></div>
+
+          <div class="final-table-wrap">
+            <div class="final-table-head">
+              <span>Место</span>
+              <span>Команда</span>
+              <span>Игроки</span>
+              <span>Счёт</span>
+            </div>
+            <div class="final-table" id="finalTable"></div>
+          </div>
+
+          <div class="finish-footer" id="finishFooter"></div>
+        </section>
+      </main>
+    </div>
+
+    <!-- Большой вопрос -->
+    <section class="question-overlay hidden" id="questionOverlay" aria-live="polite">
+      <div class="question-noise"></div>
+      <div class="question-top">
+        <div class="question-meta">
+          <span class="question-theme" id="qTheme">Тема</span>
+          <span class="question-value" id="qValue">100</span>
+        </div>
+        <div class="question-timer hidden" id="qTimer">
+          <strong id="qTimerValue">60</strong>
+          <small id="qTimerLabel">сек</small>
+        </div>
+        <div class="question-badge" id="qBadge">Вопрос</div>
+      </div>
+
+      <div class="question-content" id="questionContent">
+        <div class="question-text-wrap">
+          <div class="question-kicker" id="qKicker">Вопрос</div>
+          <div class="question-image-wrap hidden" id="qImageWrap">
+            <img id="qImage" alt="Иллюстрация к вопросу" />
+          </div>
+          <h1 class="question-text" id="qText"></h1>
+        </div>
+
+        <div class="question-status" id="qStatus">
+          <div class="status-inner" id="qStatusInner"></div>
+        </div>
+      </div>
+
+      <div class="vote-panel hidden" id="votePanel">
+        <div class="vote-panel-head">
+          <span class="eyebrow">Решение команд</span>
+          <h2>Идёт голосование за пас</h2>
+        </div>
+        <div class="vote-counts">
+          <div class="vote-count vote-count--continue" id="voteContinueCard">
+            <span>Продолжить</span>
+            <strong id="voteContinue">0</strong>
+            <div class="vote-bar"><i id="voteContinueBar"></i></div>
+          </div>
+          <div class="vote-count vote-count--pass" id="votePassCard">
+            <span>Пас вопроса</span>
+            <strong id="votePass">0</strong>
+            <div class="vote-bar"><i id="votePassBar"></i></div>
+          </div>
+        </div>
+        <div class="vote-meta">
+          <span id="voteStatusText">Ожидаем голоса команд</span>
+          <span id="voteTimerText"></span>
+        </div>
+        <div class="vote-chips" id="voteChips"></div>
+        <div class="vote-hint" id="voteHint">Один голос от команды. Результат подтверждает ведущий.</div>
+      </div>
+
+      <footer class="overlay-teams" id="overlayTeams"></footer>
+    </section>
+
+    <div class="effect-layer hidden" id="effectLayer" aria-hidden="true">
+      <div class="effect-noise"></div>
+      <div class="effect-content" id="effectContent"></div>
+      <div class="confetti-layer" id="effectConfetti"></div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/common.js?v=20261026-1"></script>
+    <script src="/js/screen.js?v=20261026-1"></script>
+  </body>
+</html>

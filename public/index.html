@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#080b16" />
+    <title>Своя игра — локальная версия</title>
+    <link rel="stylesheet" href="/css/base.css?v=20261026-1" />
+    <link rel="stylesheet" href="/css/index.css?v=20261026-1" />
+  </head>
+  <body class="landing-page">
+    <div class="landing-glow landing-glow--one"></div>
+    <div class="landing-glow landing-glow--two"></div>
+
+    <main class="landing-shell">
+      <header class="landing-header">
+        <div class="landing-logo">С</div>
+        <div>
+          <h1>СВОЯ ИГРА</h1>
+          <div class="branding-tagline landing-brand-tagline">ЯЧЕЙКА 9.11</div>
+          <p>Локальная версия для компьютера ведущего и телефонов игроков</p>
+        </div>
+      </header>
+
+      <section class="landing-hero">
+        <span class="landing-eyebrow">Сервер запущен · порт 3000</span>
+        <h2>Три экрана.<br /><em>Одна игра.</em></h2>
+        <p>
+          На большом экране — поле и вопросы. На ноутбуке — управление.
+          На телефонах — кнопки ответа и голосование. Всё синхронизируется мгновенно.
+        </p>
+      </section>
+
+      <section class="role-grid">
+        <a class="role-card role-card--screen" href="/screen">
+          <span class="role-icon">▣</span>
+          <span class="role-kicker">Большой экран / проектор</span>
+          <strong>Экран показа</strong>
+          <span class="role-desc">Поле, вопросы, табло команд, голосование и финал.</span>
+          <span class="role-link">Открыть /screen <b>→</b></span>
+        </a>
+
+        <a class="role-card role-card--host" href="/host">
+          <span class="role-icon">⌘</span>
+          <span class="role-kicker">Ноутбук ведущего</span>
+          <strong>Пульт управления</strong>
+          <span class="role-desc">Мини-поле, оценки ответов, голосование и таймеры.</span>
+          <span class="role-link">Открыть /host <b>→</b></span>
+        </a>
+
+        <a class="role-card role-card--player" href="/player">
+          <span class="role-icon">☎</span>
+          <span class="role-kicker">Телефон игрока</span>
+          <strong>Пульт игрока</strong>
+          <span class="role-desc">Имя, команда, кнопка ответа и голосование за пас.</span>
+          <span class="role-link">Открыть /player <b>→</b></span>
+        </a>
+
+        <a class="role-card role-card--editor" href="/editor">
+          <span class="role-icon">✎</span>
+          <span class="role-kicker">Пароль ведущего</span>
+          <strong>Редактор игры</strong>
+          <span class="role-desc">Свои категории, вопросы и изображения. Экспорт и импорт JSON.</span>
+          <span class="role-link">Открыть /editor <b>→</b></span>
+        </a>
+      </section>
+
+      <section class="landing-notes">
+        <div class="landing-note">
+          <span class="landing-note-icon">1</span>
+          <div>
+            <strong>Откройте пульт на ноутбуке</strong>
+            <span>В отдельном окне перейдите на <code id="hostAddress">/host</code>.</span>
+          </div>
+        </div>
+        <div class="landing-note">
+          <span class="landing-note-icon">2</span>
+          <div>
+            <strong>Выведите экран на проектор</strong>
+            <span>Откройте <code id="screenAddress">/screen</code> на большом мониторе или ТВ.</span>
+          </div>
+        </div>
+        <div class="landing-note">
+          <span class="landing-note-icon">3</span>
+          <div>
+            <strong>Раздайте телефоны игрокам</strong>
+            <span>Сканируйте QR-код с экрана или откройте <code id="playerAddress">/player</code> по IP компьютера.</span>
+          </div>
+        </div>
+        <div class="landing-note">
+          <span class="landing-note-icon">4</span>
+          <div>
+            <strong>Создайте свою игру</strong>
+            <span>Пульт и <code id="editorAddress">/editor</code> защищены паролем ведущего.</span>
+          </div>
+        </div>
+      </section>
+
+      <footer class="landing-footer">
+        <span>Node.js · Express · Socket.IO · всё состояние в памяти сервера</span>
+        <span>Инструкция запуска — в <code>README.md</code></span>
+      </footer>
+    </main>
+
+    <script>
+      const base = window.location.origin;
+      document.getElementById("hostAddress").textContent = base + "/host";
+      document.getElementById("screenAddress").textContent = base + "/screen";
+      document.getElementById("playerAddress").textContent = base + "/player";
+      document.getElementById("editorAddress").textContent = base + "/editor";
+    </script>
+  </body>
+</html>

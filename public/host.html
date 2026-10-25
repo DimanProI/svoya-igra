@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b1020" />
+    <title>Своя игра — пульт ведущего</title>
+    <link rel="stylesheet" href="/css/base.css?v=20261026-1" />
+    <link rel="stylesheet" href="/css/host.css?v=20261026-1" />
+  </head>
+  <body class="host-page">
+    <div class="host-shell is-locked">
+      <header class="host-topbar">
+        <div class="host-brand">
+          <div class="host-logo">С</div>
+          <div>
+            <div class="host-title">Пульт ведущего</div>
+            <div class="branding-tagline host-brand-tagline">ЯЧЕЙКА 9.11</div>
+            <div class="host-subtitle" id="hostRoundLabel">Своя игра · лобби</div>
+          </div>
+        </div>
+
+        <div class="host-status-cluster">
+          <span class="host-phase-pill" id="hostPhasePill">Лобби</span>
+          <div class="host-timer hidden" id="hostTimer">
+            <strong id="hostTimerValue">60</strong>
+            <span id="hostTimerLabel">сек</span>
+          </div>
+          <span class="conn" id="hostConnection">На связи</span>
+        </div>
+
+        <div class="host-top-actions">
+          <a class="host-link" href="/editor" target="_blank" rel="noopener">Редактор ↗</a>
+          <a class="host-link" href="/screen" target="_blank" rel="noopener">Экран ↗</a>
+          <button class="host-small-btn" type="button" data-action="logout">Выйти</button>
+          <button class="host-small-btn" type="button" data-action="new-game">Новая игра</button>
+        </div>
+      </header>
+
+      <main class="host-main">
+        <section class="host-left">
+          <div class="selector-card" id="selectorCard">
+            <div class="selector-card-main">
+              <span class="host-label">Сейчас выбирает</span>
+              <div class="selector-current">
+                <span class="avatar" id="selectorAvatar">?</span>
+                <div>
+                  <strong id="selectorTeamName">Ожидание команд</strong>
+                  <span id="selectorHint">Подключите телефоны игроков</span>
+                </div>
+              </div>
+            </div>
+            <button
+              class="host-mini-action hidden"
+              id="nextSelectorBtn"
+              type="button"
+              data-action="next-selector"
+              title="Передать выбор следующей команде"
+            >
+              Следующий ↻
+            </button>
+          </div>
+
+          <div class="host-panel mini-board-panel">
+            <div class="host-panel-head">
+              <div>
+                <span class="host-label">Мини-копия</span>
+                <h2>Игровое поле</h2>
+              </div>
+              <span class="host-round-chip" id="miniRoundLabel">Раунд 1</span>
+            </div>
+            <div class="mini-board" id="miniBoard"></div>
+            <p class="mini-board-hint" id="miniBoardHint">
+              Кликните по ячейке, чтобы выбрать вопрос
+            </p>
+          </div>
+
+          <div class="host-panel teams-panel">
+            <div class="host-panel-head">
+              <div>
+                <span class="host-label">Счёт и связь</span>
+                <h2>Команды</h2>
+              </div>
+              <span class="teams-meta" id="teamsMeta">0 команд</span>
+            </div>
+            <div class="host-team-list" id="hostTeamList"></div>
+          </div>
+        </section>
+
+        <section class="host-right">
+          <div class="host-panel control-panel">
+            <div class="host-panel-head control-panel-head">
+              <div>
+                <span class="host-label">Управление</span>
+                <h2 id="controlTitle">Лобби</h2>
+              </div>
+              <span class="control-phase" id="controlPhase">Ожидание</span>
+            </div>
+            <div class="control-content" id="controlContent"></div>
+            <div class="control-actions" id="controlActions"></div>
+          </div>
+
+          <div class="host-bottom-row">
+            <button
+              class="host-action-btn host-action-btn--large host-action-btn--ghost"
+              id="nextRoundBtn"
+              type="button"
+              data-action="next-round"
+              disabled
+            >
+              Следующий раунд
+            </button>
+            <button
+              class="host-action-btn host-action-btn--large host-action-btn--danger-ghost"
+              type="button"
+              data-action="new-game"
+            >
+              Новая игра
+            </button>
+          </div>
+
+          <details class="host-panel settings-panel" id="settingsPanel">
+            <summary>
+              <span>
+                <span class="host-label">Параметры</span>
+                <strong>Таймеры и настройки</strong>
+              </span>
+              <span class="details-chevron">⌄</span>
+            </summary>
+            <form class="settings-form" id="settingsForm">
+              <div class="setting-row">
+                <label class="switch-label">
+                  <input type="checkbox" id="questionTimerEnabled" />
+                  <span class="switch"><i></i></span>
+                  <span>Таймер вопроса</span>
+                </label>
+                <label class="number-field">
+                  <span>Секунд</span>
+                  <input type="number" id="questionTimerSeconds" min="5" max="300" step="5" />
+                </label>
+              </div>
+              <div class="setting-row">
+                <label class="switch-label">
+                  <input type="checkbox" id="votingTimerEnabled" />
+                  <span class="switch"><i></i></span>
+                  <span>Таймер голосования</span>
+                </label>
+                <label class="number-field">
+                  <span>Секунд</span>
+                  <input type="number" id="votingTimerSeconds" min="5" max="120" step="5" />
+                </label>
+              </div>
+              <div class="setting-row setting-row--penalty">
+                <label class="switch-label">
+                  <input type="checkbox" id="wrongAnswerPenaltyEnabled" />
+                  <span class="switch"><i></i></span>
+                  <span>Отнимать баллы за неверный ответ</span>
+                </label>
+                <span class="setting-note">Штраф = стоимость вопроса</span>
+              </div>
+              <div class="settings-footer">
+                <p>Таймер вопроса перезапустится при сохранении.</p>
+                <button class="host-small-btn host-small-btn--accent" type="submit">
+                  Сохранить
+                </button>
+              </div>
+            </form>
+          </details>
+
+          <div class="host-hotkeys">
+            <span><kbd>F5</kbd> обновить пульт</span>
+            <span><a href="/player" target="_blank" rel="noopener">Открыть телефон игрока ↗</a></span>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <input
+      type="file"
+      id="importGameFile"
+      accept=".json,application/json"
+      hidden
+      aria-hidden="true"
+    />
+
+    <div class="confirm-overlay hidden" id="newGameDialog">
+      <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="newGameTitle">
+        <div class="confirm-icon">↺</div>
+        <span class="host-label">Сброс партии</span>
+        <h2 id="newGameTitle">Начать новую игру?</h2>
+        <p id="newGameDialogText">
+          Текущие очки и прогресс поля будут сброшены. Команды останутся в лобби.
+        </p>
+        <div class="confirm-actions">
+          <button class="host-action-btn host-action-btn--ghost" type="button" data-action="close-new-game">
+            Отмена
+          </button>
+          <button class="host-action-btn host-action-btn--danger" type="button" data-action="confirm-new-game">
+            Начать новую
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="confirm-overlay hidden" id="hostConfirmDialog">
+      <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="hostConfirmTitle">
+        <div class="confirm-icon" id="hostConfirmIcon">!</div>
+        <span class="host-label">Исключение из лобби</span>
+        <h2 id="hostConfirmTitle">Исключить?</h2>
+        <p id="hostConfirmText">Игрок или команда вернутся на экран входа.</p>
+        <div class="confirm-actions">
+          <button class="host-action-btn host-action-btn--ghost" type="button" data-action="host-confirm-cancel">
+            Отмена
+          </button>
+          <button class="host-action-btn host-action-btn--danger" type="button" data-action="host-confirm-accept">
+            Исключить
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="auth-overlay" id="hostAuth">
+      <form class="auth-card" id="hostAuthForm">
+        <div class="auth-icon">⌘</div>
+        <span class="auth-eyebrow">Защищённая зона</span>
+        <h1>Пульт ведущего</h1>
+        <div class="branding-tagline auth-brand-tagline">ЯЧЕЙКА 9.11</div>
+        <p>Введите пароль ведущего. Он также открывает редактор игр.</p>
+        <label class="auth-field">
+          <span>Пароль</span>
+          <input
+            type="password"
+            id="hostPassword"
+            autocomplete="current-password"
+            placeholder="••••••••"
+            required
+          />
+        </label>
+        <div class="auth-error hidden" id="hostAuthError" role="alert"></div>
+        <button class="auth-submit" id="hostAuthSubmit" type="submit">Войти</button>
+        <span class="conn is-offline" id="hostAuthConnection">Подключение</span>
+      </form>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/common.js?v=20261026-1"></script>
+    <script src="/js/host.js?v=20261026-1"></script>
+  </body>
+</html>
