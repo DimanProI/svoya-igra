@@ -1071,15 +1071,10 @@ function applyVotingOutcome(outcome, source) {
     game.currentQuestion.buzzAt = null;
     game.currentQuestion.result = null;
     game.currentQuestion.answerTimer = null;
-    game.currentQuestion.buzzUnlocked = !game.settings.manualBuzzControlEnabled;
     game.votes.clear();
     resetBlocks();
     game.voting = null;
-    if (game.settings.manualBuzzControlEnabled) {
-      clearQuestionTimer();
-    } else {
-      armQuestionTimer();
-    }
+    armQuestionTimer();
     setEvent("voting:resume", {
       outcome,
       source,
@@ -1087,7 +1082,9 @@ function applyVotingOutcome(outcome, source) {
       details,
       questionTheme,
       questionValue,
-      buzzLocked: Boolean(game.settings.manualBuzzControlEnabled)
+      buzzLocked: Boolean(
+        game.settings.manualBuzzControlEnabled && !game.currentQuestion.buzzUnlocked
+      )
     });
     broadcast();
     return true;
