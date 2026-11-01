@@ -34,9 +34,12 @@ const els = {
   settingsForm: $("#settingsForm"),
   questionTimerEnabled: $("#questionTimerEnabled"),
   questionTimerSeconds: $("#questionTimerSeconds"),
+  answerTimerEnabled: $("#answerTimerEnabled"),
+  answerTimerSeconds: $("#answerTimerSeconds"),
   votingTimerEnabled: $("#votingTimerEnabled"),
   votingTimerSeconds: $("#votingTimerSeconds"),
   wrongAnswerPenaltyEnabled: $("#wrongAnswerPenaltyEnabled"),
+  manualBuzzControlEnabled: $("#manualBuzzControlEnabled"),
 
   hostAuth: $("#hostAuth"),
   hostAuthForm: $("#hostAuthForm"),
@@ -175,7 +178,7 @@ els.hostAuthForm.addEventListener("submit", async (event) => {
 });
 
 socket.on("host:state", (nextState) => {
-  if (!nextState || !authorized) return;
+  if (!nextState) return;
   SI.acceptState(nextState);
   state = nextState;
   render();
@@ -532,6 +535,14 @@ function renderControl() {
         <button class="host-action-btn host-action-btn--ghost" data-action="close-question">
           Отменить выбор
         </button>`;
+    } else if (q.status === "revealed") {
+      title = "Правильный ответ";
+      phaseLabel = "Показ ответа";
+      content = revealedContent(q);
+      actions = `
+        <button class="host-action-btn host-action-btn--primary host-action-btn--wide" data-action="close-question">
+          К выбору темы →
+        </button>`;
     } else if (q.status === "result") {
       title = "Ответ верный";
       phaseLabel = "Результат";
@@ -553,6 +564,20 @@ function renderControl() {
         </button>
         <button class="host-action-btn host-action-btn--warning" data-action="start-voting">
           🗳 Голосование за пас
+        </button>
+        <button class="host-action-btn host-action-btn--ghost" data-action="close-question">
+          Закрыть вопрос
+        </button>`;
+    } else if (q.buzzLocked) {
+      title = "Кнопки закрыты";
+      phaseLabel = "Ждём ведущего";
+      content = shownContent(q);
+      actions = `
+        <button class="host-action-btn host-action-btn--primary host-action-btn--wide" data-action="unlock-buzz">
+          🔓 Разрешить ответы
+        </button>
+        <button class="host-action-btn host-action-btn--warning" data-action="start-voting">
+          🗳 Запустить голосование
         </button>
         <button class="host-action-btn host-action-btn--ghost" data-action="close-question">
           Закрыть вопрос
@@ -773,10 +798,13 @@ function questionHead(q, label = "Вопрос") {
 }
 
 function selectedContent(q) {
+  const buzzMode = state.settings?.manualBuzzControlEnabled
+    ? "После показа кнопки будут закрыты до нажатия «Разрешить ответы»."
+    : "После показа кнопки игроков активируются сразу.";
   return `
     ${questionHead(q, "Подготовка вопроса")}
     <div class="ctl-status-line"><span class="ctl-status-dot"></span>Вопрос выбран, но ещё не показан игрокам</div>
-    <div class="ctl-warning">После показа запустится таймер вопроса: ${
+    <div class="ctl-warning">${buzzMode} Таймер вопроса: ${
       state.settings?.questionTimerEnabled
         ? `${state.settings.questionTimerSeconds} сек`
         : "выключен"
@@ -788,30 +816,35 @@ function shownContent(q) {
   const online = state.teams.filter((team) => team.onlineCount > 0);
   const allBlocked = online.length > 0 && online.every((team) => team.blocked);
   const wrong = q.result && !q.result.correct;
+  const locked = Boolean(q.buzzLocked);
+
+  const statusBlock = wrong
+    ? `<div class="ctl-result ctl-result--wrong">
+        <div class="ctl-result-copy">
+          <span>${q.result.timedOut ? "Время на ответ истекло" : "Неверный ответ"}</span>
+          <strong>${SI.escapeHtml(q.result.teamName)}</strong>
+          <small>Команда заблокирована до конца вопроса${
+            q.result.penalty
+              ? ` · штраф ${SI.formatScore(-q.result.penalty)} · счёт ${SI.formatScore(q.result.score)}`
+              : ""
+          }</small>
+        </div>
+        <div class="ctl-result-score">${q.result.penalty ? `−${SI.formatScore(q.result.penalty)}` : "✕"}</div>
+      </div>`
+    : locked
+      ? `<div class="ctl-warning ctl-warning--danger">Кнопки закрыты. Нажмите «Разрешить ответы», когда будете готовы принимать ответы.</div>`
+      : `<div class="ctl-status-line"><span class="ctl-status-dot"></span>Ждём, кто первым нажмёт «Ответить»</div>`;
+
+  const bottomWarning = allBlocked
+    ? `<div class="ctl-warning ctl-warning--danger">Все команды в сети уже ошиблись. Голосование за пас запустится автоматически через пару секунд.</div>`
+    : locked
+      ? `<div class="ctl-warning">Игроки видят, что кнопки ещё закрыты. Ведущий откроет их вручную.</div>`
+      : `<div class="ctl-warning">На телефонах игроков кнопка активна. После первого нажатия она заблокируется у остальных.</div>`;
 
   return `
     ${questionHead(q, "Вопрос на экране")}
-    ${
-      wrong
-        ? `<div class="ctl-result ctl-result--wrong">
-            <div class="ctl-result-copy">
-              <span>Неверный ответ</span>
-              <strong>${SI.escapeHtml(q.result.teamName)}</strong>
-              <small>Команда заблокирована до конца вопроса${
-                q.result.penalty
-                  ? ` · штраф ${SI.formatScore(-q.result.penalty)} · счёт ${SI.formatScore(q.result.score)}`
-                  : ""
-              }</small>
-            </div>
-            <div class="ctl-result-score">${q.result.penalty ? `−${SI.formatScore(q.result.penalty)}` : "✕"}</div>
-          </div>`
-        : `<div class="ctl-status-line"><span class="ctl-status-dot"></span>Ждём, кто первым нажмёт «Ответить»</div>`
-    }
-    ${
-      allBlocked
-        ? `<div class="ctl-warning ctl-warning--danger">Все команды в сети уже ошиблись. Голосование за пас запустится автоматически через пару секунд.</div>`
-        : `<div class="ctl-warning">На телефонах игроков кнопка активна. После первого нажатия она заблокируется у остальных.</div>`
-    }
+    ${statusBlock}
+    ${bottomWarning}
   `;
 }
 
@@ -837,6 +870,14 @@ function buzzedContent(q) {
   `;
 }
 
+function answerCard(q) {
+  return `
+    <div class="ctl-answer-reveal">
+      <span>Правильный ответ</span>
+      <strong>${SI.escapeHtml(q.answer || "Ответ не был указан")}</strong>
+    </div>`;
+}
+
 function resultContent(q) {
   const result = q.result || {};
   return `
@@ -848,8 +889,29 @@ function resultContent(q) {
       </div>
       <div class="ctl-result-score">+${SI.formatScore(result.delta || q.value)}</div>
     </div>
+    ${answerCard(q)}
     ${questionHead(q, "Ответ засчитан")}
-    <div class="ctl-warning">Экран закроет вопрос автоматически. Можно ускорить кнопкой «К выбору темы».</div>
+    <div class="ctl-warning">Правильный ответ уже на экране. Через несколько секунд вопрос закроется автоматически — или нажмите «К выбору темы».</div>
+  `;
+}
+
+function revealedContent(q) {
+  const reason =
+    q.revealReason === "voting_pass"
+      ? "Вопрос закрыт голосованием"
+      : q.revealReason === "host_closed"
+        ? "Вопрос пропущен ведущим"
+        : "Вопрос закрыт";
+  return `
+    <div class="ctl-hero">
+      <span class="ctl-eyebrow">${SI.escapeHtml(reason)}</span>
+      <h3 class="ctl-title">${SI.escapeHtml(q.theme)} <span style="color:var(--accent)">· ${SI.formatScore(
+        q.value
+      )}</span></h3>
+    </div>
+    ${answerCard(q)}
+    ${questionHead(q, "Правильный ответ на экране")}
+    <div class="ctl-warning">Ответ показан на большом экране и телефонах. Вопрос закроется автоматически через несколько секунд.</div>
   `;
 }
 
@@ -978,7 +1040,12 @@ function updateTimer() {
   const remaining = SI.remainingMs(timer.endsAt);
   const seconds = Math.max(0, Math.ceil(remaining / 1000));
   els.timerValue.textContent = String(seconds);
-  els.timerLabel.textContent = timer.type === "voting" ? "до голосования" : "сек";
+  els.timerLabel.textContent =
+    timer.type === "voting"
+      ? "до голосования"
+      : timer.type === "answer"
+        ? "на ответ"
+        : "сек";
   els.timer.classList.toggle("is-urgent", remaining <= 10000);
 }
 
@@ -992,10 +1059,15 @@ function syncSettings() {
   if (!state?.settings || settingsDirty) return;
   els.questionTimerEnabled.checked = Boolean(state.settings.questionTimerEnabled);
   els.questionTimerSeconds.value = String(state.settings.questionTimerSeconds);
+  els.answerTimerEnabled.checked = Boolean(state.settings.answerTimerEnabled);
+  els.answerTimerSeconds.value = String(state.settings.answerTimerSeconds);
   els.votingTimerEnabled.checked = Boolean(state.settings.votingTimerEnabled);
   els.votingTimerSeconds.value = String(state.settings.votingTimerSeconds);
   els.wrongAnswerPenaltyEnabled.checked = Boolean(
     state.settings.wrongAnswerPenaltyEnabled
+  );
+  els.manualBuzzControlEnabled.checked = Boolean(
+    state.settings.manualBuzzControlEnabled
   );
 }
 
@@ -1008,9 +1080,12 @@ els.settingsForm.addEventListener("submit", async (event) => {
   const result = await command("updateSettings", {
     questionTimerEnabled: els.questionTimerEnabled.checked,
     questionTimerSeconds: Number(els.questionTimerSeconds.value),
+    answerTimerEnabled: els.answerTimerEnabled.checked,
+    answerTimerSeconds: Number(els.answerTimerSeconds.value),
     votingTimerEnabled: els.votingTimerEnabled.checked,
     votingTimerSeconds: Number(els.votingTimerSeconds.value),
-    wrongAnswerPenaltyEnabled: els.wrongAnswerPenaltyEnabled.checked
+    wrongAnswerPenaltyEnabled: els.wrongAnswerPenaltyEnabled.checked,
+    manualBuzzControlEnabled: els.manualBuzzControlEnabled.checked
   });
   if (result.ok) {
     settingsDirty = false;
@@ -1192,6 +1267,9 @@ document.addEventListener("click", async (event) => {
       break;
     case "show-question":
       await command("showQuestion", {}, button);
+      break;
+    case "unlock-buzz":
+      await command("unlockBuzz", {}, button);
       break;
     case "judge-correct":
       await command("judgeAnswer", { correct: true }, button);

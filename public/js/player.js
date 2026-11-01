@@ -495,7 +495,8 @@ function shortPhaseLabel(snapshot) {
   if (status === "selected") return "Подготовка";
   if (status === "buzzed") return "Ответ";
   if (status === "result") return "Результат";
-  return "Идёт вопрос";
+  if (status === "revealed") return "Правильный ответ";
+  return snapshot.currentQuestion?.buzzLocked ? "Кнопки закрыты" : "Идёт вопрос";
 }
 
 function gameContent() {
@@ -610,7 +611,15 @@ function questionContent() {
   let statusTitle = "Кто первым нажмёт кнопку?";
   let statusText = "Если готовы отвечать — жмите большую кнопку.";
 
-  if (question.status === "buzzed") {
+  if (question.status === "revealed") {
+    statusClass = "p-status--neutral";
+    statusIcon = "📖";
+    statusTitle = "Правильный ответ";
+    statusText =
+      question.revealReason === "voting_pass"
+        ? "Вопрос закрыт голосованием команд."
+        : "Вопрос закрыт ведущим.";
+  } else if (question.status === "buzzed") {
     if (myBuzz) {
       statusClass = "p-status--good p-status--you";
       statusIcon = "✋";
@@ -637,28 +646,39 @@ function questionContent() {
   } else if (result && !result.correct) {
     if (result.teamId === myTeam.id) {
       statusClass = "p-status--bad";
-      statusIcon = "✕";
-      statusTitle = result.penalty
-        ? `Неверно · −${SI.formatScore(result.penalty)}`
-        : "Неверно";
+      statusIcon = result.timedOut ? "⏱" : "✕";
+      statusTitle = result.timedOut
+        ? "Время на ответ истекло"
+        : result.penalty
+          ? `Неверно · −${SI.formatScore(result.penalty)}`
+          : "Неверно";
       statusText = result.penalty
-        ? "Штраф снят со счёта. Команда заблокирована до конца вопроса."
+        ? "Ответ засчитан неверным, штраф снят. Команда заблокирована до конца вопроса."
         : "Команда заблокирована до конца вопроса. Дождитесь следующего шанса или голосования.";
     } else {
       statusClass = "p-status--warn";
-      statusIcon = "⚡";
-      statusTitle = `Команда «${result.teamName}» ошиблась${
-        result.penalty ? ` · −${SI.formatScore(result.penalty)}` : ""
-      }`;
+      statusIcon = result.timedOut ? "⏱" : "⚡";
+      statusTitle = result.timedOut
+        ? `У команды «${result.teamName}» истекло время`
+        : `Команда «${result.teamName}» ошиблась${
+            result.penalty ? ` · −${SI.formatScore(result.penalty)}` : ""
+          }`;
       statusText = myBlocked
         ? "Вы уже ошиблись в этом вопросе."
-        : "Ваш шанс! Кнопка снова активна.";
+        : question.buzzLocked
+          ? "Ведущий откроет кнопки для следующей попытки."
+          : "Ваш шанс! Кнопка снова активна.";
     }
   } else if (myBlocked) {
     statusClass = "p-status--bad";
     statusIcon = "✕";
     statusTitle = "Команда ошиблась";
     statusText = "Кнопка недоступна до конца вопроса.";
+  } else if (question.buzzLocked) {
+    statusClass = "p-status--warn";
+    statusIcon = "🔒";
+    statusTitle = "Кнопки ещё закрыты";
+    statusText = "Ведущий откроет приём ответов, когда будет готов.";
   }
 
   let action = "";
@@ -669,6 +689,9 @@ function questionContent() {
     if (myBlocked) {
       label = "ЗАБЛОКИРОВАНО";
       hint = "Команда уже ошиблась";
+    } else if (question.buzzLocked) {
+      label = "ЖДЁМ ВЕДУЩЕГО";
+      hint = "Кнопки откроет ведущий";
     } else if (!state.you.canBuzz && !pendingBuzz) {
       label = "ЖДЁМ...";
       hint = "Кнопка пока недоступна";
@@ -693,6 +716,15 @@ function questionContent() {
   }
 
   const timer = timerMarkup();
+  const answerVisible =
+    question.status === "revealed" ||
+    (question.status === "result" && question.result?.correct);
+  const answerHtml = answerVisible
+    ? `<div class="p-answer-reveal">
+        <span>Правильный ответ</span>
+        <strong>${SI.escapeHtml(question.answer || "Ответ не указан")}</strong>
+      </div>`
+    : "";
 
   return `
     <div class="p-screen">
@@ -715,6 +747,7 @@ function questionContent() {
         }
         ${timer}
       </div>
+      ${answerHtml}
       <div class="p-status ${statusClass}">
         <span class="p-status-icon">${statusIcon}</span>
         <div class="p-status-copy">
@@ -852,7 +885,13 @@ function timerMarkup() {
   const timer = state.timer;
   return `
     <div class="p-timer ${timer ? "" : "hidden"}" id="playerTimer">
-      <span>${timer?.type === "voting" ? "Голосование" : "До конца"}</span>
+      <span>${
+        timer?.type === "voting"
+          ? "Голосование"
+          : timer?.type === "answer"
+            ? "На ответ"
+            : "До конца"
+      }</span>
       <strong data-timer-value>${timer ? Math.ceil(SI.remainingMs(timer.endsAt) / 1000) : 0}</strong>
       <small>сек</small>
     </div>`;
@@ -973,24 +1012,37 @@ function handlePlayerEvent(event) {
     case "wrong": {
       if (data.teamId === myTeam.id) {
         SI.toast(
-          data.penalty
-            ? `Неверно. Штраф −${SI.formatScore(data.penalty)}. Команда заблокирована.`
-            : "Неверно. Команда заблокирована до конца вопроса.",
+          data.timedOut || data.reason === "answer_timeout"
+            ? "Время на ответ истекло. Ответ засчитан неверным."
+            : data.penalty
+              ? `Неверно. Штраф −${SI.formatScore(data.penalty)}. Команда заблокирована.`
+              : "Неверно. Команда заблокирована до конца вопроса.",
           "error"
         );
         if (navigator.vibrate) navigator.vibrate(80);
       }
       break;
     }
+    case "buzz:unlocked":
+      SI.toast("Кнопки открыты! Можно отвечать.", "success", 1800);
+      if (navigator.vibrate) navigator.vibrate([35, 35, 60]);
+      break;
+    case "question:reveal":
+      break;
     case "voting:start":
       SI.toast("Голосование за пас: сделайте выбор.", "info");
       if (navigator.vibrate) navigator.vibrate([40, 50, 40]);
       break;
     case "voting:resume":
-      SI.toast("Играем дальше! Кнопка ответа снова активна.", "success");
+      SI.toast(
+        data.buzzLocked
+          ? "Играем дальше! Кнопки откроет ведущий."
+          : "Играем дальше! Кнопка ответа снова активна.",
+        "success"
+      );
       break;
     case "voting:pass":
-      SI.toast("Пас вопроса. Переходим к выбору темы.", "info");
+      SI.toast("Пас вопроса. Сейчас будет показан правильный ответ.", "info");
       break;
     case "voting:tie":
       SI.toast("Голоса разделились. Решает ведущий.", "info");

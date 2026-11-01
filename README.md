@@ -44,7 +44,10 @@
 - Фиксация первого нажатия на сервере.
 - Блокировка ошибившихся команд до конца вопроса.
 - Голосование за пас с подсчётом голосов в реальном времени.
-- Таймеры вопроса и голосования.
+- Таймеры вопроса, ответа команды и голосования.
+- Ручное открытие кнопок ведущим: кнопки закрыты до команды «Разрешить ответы».
+- Показ правильного ответа после верного ответа и после паса/пропуска вопроса.
+- Автоподгонка размера шрифта для длинных вопросов — без прокрутки на большом экране.
 - Настройка штрафа за неверный ответ.
 - QR-код для подключения телефонов.
 - Восстановление сессии игрока после обрыва связи.
@@ -153,18 +156,19 @@ npm start
 - Очередь выбора видна на `/screen` и `/host`: «Сейчас выбирает: …».
 - Команда называет тему и стоимость.
 - Ведущий кликает по ячейке на мини-поле.
-- Вопрос ещё не виден игрокам: ведущий видит текст, ответ и изображение.
+- Вопрос ещё не виден игрокам: ведущий видит текст, ответ и изображение в превью.
 - Кнопка **«Показать вопрос»** выводит вопрос на `/screen` и активирует кнопки на телефонах.
+- Если включён режим «Кнопки открывает ведущий», после показа вопроса кнопки остаются закрытыми до нажатия **«Разрешить ответы»**.
 
 #### 3. Ответ
 
 - Первое нажатие фиксируется сервером мгновенно.
 - На `/screen` появляется крупная плашка «Отвечает: Команда».
 - У остальных команд кнопка блокируется.
+- После нажатия запускается таймер ответа; когда он истекает, ответ автоматически считается неверным.
 - Ведущий нажимает **«Верно»** или **«Неверно»**.
-- **Верно:** баллы начисляются, вопрос закрывается, ход переходит дальше.
-- **Неверно:** команда блокируется до конца вопроса.
-- При включённом штрафе со счёта дополнительно снимается стоимость вопроса.
+- **Верно:** баллы начисляются, правильный ответ показывается на экране и телефонах, затем вопрос закрывается.
+- **Неверно:** команда блокируется до конца вопроса; при включённом штрафе снимается стоимость вопроса.
 
 #### 4. Голосование за пас
 
@@ -176,7 +180,7 @@ npm start
 - При явном большинстве и включённом таймере результат применяется автоматически.
 - При ничьей решение принимает ведущий.
 - **Продолжить:** блокировки снимаются, вопрос продолжается.
-- **Пас:** вопрос закрывается без баллов.
+- **Пас:** вопрос закрывается без баллов, правильный ответ показывается на экране и телефонах.
 
 #### 5. Раунды и финал
 
@@ -224,9 +228,11 @@ npm start
 
 | Настройка | Описание |
 | --- | --- |
-| Таймер вопроса | Включение и длительность таймера на ответ |
+| Таймер вопроса | Включение и длительность таймера на обдумывание |
+| Таймер ответа команды | Запускается после нажатия кнопки; по истечении ответ считается неверным |
 | Таймер голосования | Включение и длительность голосования |
 | Штраф за неверный ответ | Отнимать стоимость вопроса при ошибке |
+| Кнопки открывает ведущий | Кнопки закрыты до нажатия «Разрешить ответы» |
 
 Дополнительно на пульте доступны:
 
@@ -283,7 +289,7 @@ New-NetFirewallRule -DisplayName "Своя игра 3000" -Direction Inbound -Pr
 - **Пароль:** `/host` и `/editor` получают временный токен после проверки `HOST_PASSWORD`.
 - **Изображения:** уменьшаются через Canvas, хранятся в JSON и раздаются отдельным HTTP-маршрутом.
 - **Сервер авторитетен:** проверяет первое нажатие, блокировки, голоса, таймеры, штрафы и переходы фаз.
-- **Ролевые данные:** экран не получает правильный ответ; игрок получает только своё состояние.
+- **Ролевые данные:** до раскрытия ответа экран не получает правильный ответ; игрок получает только своё состояние.
 - **Таймеры:** считаются на сервере по `endsAt`.
 
 Основные фазы:
@@ -292,14 +298,14 @@ New-NetFirewallRule -DisplayName "Своя игра 3000" -Direction Inbound -Pr
 lobby → themeSelect → question → voting → finished
 ```
 
-Внутри вопроса: `selected → shown → buzzed → result`.
+Внутри вопроса: `selected → shown → buzzed → result`, а для паса/пропуска — `revealed` (показ правильного ответа перед закрытием).
 
 #### Socket.IO-события
 
 Клиент → сервер:
 
 ```text
-auth:login, join, startGame, selectQuestion, showQuestion, buzz,
+auth:login, join, startGame, selectQuestion, showQuestion, unlockBuzz, buzz,
 judgeAnswer, startVoting, vote, finishVoting, closeQuestion,
 nextSelector, nextRound, newGame, adjustScore, updateSettings,
 removeTeam, selectGameSet, importGameSet, saveGameSet,
@@ -341,7 +347,7 @@ screen:state, host:state, player:state, lobby:state, editor:state
 npm test
 ```
 
-Smoke-тест поднимает отдельный сервер на порту **3107** и проверяет **31 сценарий**:
+Smoke-тест поднимает отдельный сервер на порту **3107** и проверяет **33 сценария**:
 
 - авторизация пульта и редактора;
 - вход команд;
@@ -349,6 +355,7 @@ Smoke-тест поднимает отдельный сервер на порт�
 - показ вопроса;
 - buzz и запрет повторного нажатия;
 - верный и неверный ответ;
+- показ правильного ответа после верного ответа и после паса;
 - штраф;
 - автоматическое голосование;
 - запрет повторного голоса;
@@ -358,7 +365,8 @@ Smoke-тест поднимает отдельный сервер на порт�
 - завершение раунда;
 - следующий раунд;
 - новая игра;
-- оба таймера;
+- таймеры вопроса, ответа команды и голосования;
+- ручная блокировка и открытие кнопок ведущим;
 - создание игры с изображением;
 - выбор игрового набора;
 - импорт и удаление игры;
@@ -403,7 +411,10 @@ A complete local prototype of a Jeopardy-style quiz game for one host computer a
 - Server-side first-buzz detection.
 - Wrong teams are locked until the end of the question.
 - Real-time pass voting.
-- Question and voting timers.
+- Question, team-answer and voting timers.
+- Host-controlled buzz unlocking: buttons stay locked until “Allow answers”.
+- The correct answer is revealed after a correct answer and after a pass/skip.
+- Automatic font fitting for long questions — no scrolling on the big screen.
 - Optional score penalty for a wrong answer.
 - QR code for player access.
 - Player session recovery after disconnect.
@@ -474,12 +485,13 @@ npm start
 3. Players scan the QR code and join/create a team on `/player`.
 4. Start the game.
 5. The current team picks a category and value.
-6. The host clicks the cell and shows the question.
-7. The first team to buzz is shown on the big screen.
-8. The host judges the answer as correct or wrong.
-9. If all teams fail, a pass vote starts automatically.
-10. Continue or pass according to the vote; a tie is decided by the host.
-11. After all questions, the final scoreboard and winner are shown.
+6. The host clicks the cell and shows the question. If manual buzz control is on, the host then clicks “Allow answers”.
+7. The first team to buzz is shown on the big screen; the answer timer starts.
+8. The host judges the answer as correct or wrong. A timeout counts as wrong.
+9. A correct answer reveals the correct answer; a pass/skip also reveals it before the question closes.
+10. If all teams fail, a pass vote starts automatically.
+11. Continue or pass according to the vote; a tie is decided by the host.
+12. After all questions, the final scoreboard and winner are shown.
 
 ### Custom games
 
@@ -494,8 +506,10 @@ The host can remove a single player with the `×` button next to their name or r
 ### Settings
 
 - Question timer: on/off and duration.
+- Team answer timer: starts after a buzz; expiry counts as a wrong answer.
 - Voting timer: on/off and duration.
 - Wrong-answer penalty: subtract the question value on a wrong answer.
+- Host-controlled buzz lock: buttons stay locked until the host allows answers.
 - Manual score adjustment: ±100 points.
 - Remove individual players or entire teams from the lobby.
 - Next selector, game set selection, JSON import, new game.
@@ -528,7 +542,7 @@ npm start
 npm test
 ```
 
-The smoke test starts an isolated server on port **3107** and runs **31 scenarios**, including authentication, gameplay, timers, penalties, image questions, custom games, import/export, lobby removal and new game. Browser UI checks were also run in Chromium at 1920×1080, 1440×900, 1366×768 and 390×844, including player/team removal and “ЯЧЕЙКА 9.11” branding.
+The smoke test starts an isolated server on port **3107** and runs **33 scenarios**, including authentication, gameplay, all timers, answer reveal, manual buzz unlocking, penalties, image questions, custom games, import/export, lobby removal and new game. Browser UI checks were also run in Chromium/Edge at 1920×1080 and 1440×900, including long-question fitting, host question previews, answer reveal and removed players’ return to the join screen.
 
 ### Limitations
 

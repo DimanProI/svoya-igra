@@ -259,6 +259,7 @@ async function main() {
   );
   await waitFor(() => host.phase === "question" && host.currentQuestion, "вопрос выбран");
   assert.strictEqual(host.currentQuestion.status, "selected");
+  assert.ok(host.currentQuestion.text, "ведущий видит текст вопроса в превью");
   assert.ok(host.currentQuestion.answer, "ведущий видит правильный ответ");
   assert.strictEqual(screen.currentQuestion.text, null, "до показа текст скрыт от экрана");
   assert.ok(!screen.currentQuestion.answer, "ответ не уходит на экран");
@@ -318,7 +319,9 @@ async function main() {
     "ячейка отмечена разыгранной"
   );
   await waitFor(() => screen.teams.find((team) => team.name === betaName)?.score === cell.value, "счёт на экране");
-  ok("верный ответ начисляет баллы и обновляет экран");
+  await waitFor(() => screen.currentQuestion?.answer === host.currentQuestion.answer, "ответ показан на экране");
+  assert.strictEqual(screen.currentQuestion.status, "result", "экран остаётся на результате");
+  ok("верный ответ начисляет баллы, обновляет экран и показывает правильный ответ");
 
   assertOk(await emitAck(hostSocket, "closeQuestion", {}), "Закрытие вопроса");
   await waitFor(() => host.phase === "themeSelect", "возврат к выбору темы");
@@ -388,12 +391,21 @@ async function main() {
     await emitAck(hostSocket, "finishVoting", { outcome: "pass" }),
     "Ведущий решает пас"
   );
-  await waitFor(() => host.phase === "themeSelect", "вопрос закрыт пасом");
+  await waitFor(
+    () => host.phase === "question" && host.currentQuestion?.status === "revealed",
+    "после паса показан ответ"
+  );
   const passedCell = host.board
     .flatMap((theme) => theme.cells)
     .find((item) => item.id === cell.id);
   assert.ok(passedCell.played, "пас закрывает ячейку без баллов");
-  ok("ничья требует решения ведущего; пас закрывает вопрос");
+  assert.strictEqual(host.currentQuestion.revealReason, "voting_pass");
+  assert.ok(host.currentQuestion.answer, "правильный ответ доступен ведущему");
+  await waitFor(() => screen.currentQuestion?.answer === host.currentQuestion.answer, "ответ на экране после паса");
+  await waitFor(() => p1State.currentQuestion?.answer === host.currentQuestion.answer, "ответ на телефонах после паса");
+  assertOk(await emitAck(hostSocket, "closeQuestion", {}), "Закрыть показ ответа");
+  await waitFor(() => host.phase === "themeSelect", "вопрос закрыт пасом");
+  ok("ничья требует решения ведущего; пас закрывает вопрос и показывает ответ");
 
   /* ----------------------- Счёт и переподключение ----------------- */
 
@@ -462,6 +474,13 @@ async function main() {
     assertOk(await emitAck(hostSocket, "showQuestion", {}), "Быстрый показ");
     await waitFor(() => host.currentQuestion?.status === "shown", "Быстрый показ: shown");
     assertOk(await emitAck(hostSocket, "closeQuestion", {}), "Быстрое закрытие");
+    await waitFor(
+      () => host.currentQuestion?.status === "revealed" || host.phase === "finished",
+      "Быстрый показ ответа"
+    );
+    if (host.currentQuestion?.status === "revealed") {
+      assertOk(await emitAck(hostSocket, "closeQuestion", {}), "Закрыть показ ответа");
+    }
     await waitFor(
       () => host.phase === "themeSelect" || host.phase === "finished",
       "Быстрый переход"
@@ -537,6 +556,8 @@ async function main() {
     await emitAck(hostSocket, "finishVoting", { outcome: "pass" }),
     "Закрыть вопрос после таймера"
   );
+  await waitFor(() => host.currentQuestion?.status === "revealed", "ответ после таймера");
+  assertOk(await emitAck(hostSocket, "closeQuestion", {}), "Закрыть ответ после таймера");
   await waitFor(() => host.phase === "themeSelect", "поле после таймера");
 
   assertOk(
@@ -568,8 +589,98 @@ async function main() {
   assert.ok(host.teams.every((team) => !team.blocked), "блокировки сняты после автоголосования");
   ok("по истечении таймера голосования большинство применяется автоматически");
 
+  /* ------------------- Таймер ответа после кнопки ------------------ */
+
   assertOk(await emitAck(hostSocket, "newGame", {}), "Сброс после тестов таймеров");
   await waitFor(() => host.phase === "lobby", "лобби после тестов таймеров");
+
+  assertOk(
+    await emitAck(hostSocket, "updateSettings", {
+      questionTimerEnabled: false,
+      answerTimerEnabled: true,
+      answerTimerSeconds: 5,
+      votingTimerEnabled: false,
+      wrongAnswerPenaltyEnabled: false,
+      manualBuzzControlEnabled: false
+    }),
+    "Включение таймера ответа"
+  );
+
+  assertOk(await emitAck(hostSocket, "startGame", {}), "Старт для таймера ответа");
+  await waitFor(() => host.phase === "themeSelect", "поле для таймера ответа");
+  cell = firstUnplayed(host);
+  assertOk(await emitAck(hostSocket, "selectQuestion", { cellId: cell.id }), "Вопрос для ответа");
+  await waitFor(() => host.currentQuestion?.status === "selected", "Вопрос для ответа выбран");
+  assertOk(await emitAck(hostSocket, "showQuestion", {}), "Показать вопрос для ответа");
+  await waitFor(() => host.currentQuestion?.status === "shown", "Вопрос для ответа показан");
+
+  assertOk(await emitAck(p1Again, "buzz", {}), "Нажатие перед таймером ответа");
+  await waitFor(() => host.currentQuestion?.status === "buzzed", "Команда отвечает по таймеру");
+  await waitFor(() => host.timer?.type === "answer", "Запущен таймер на ответ");
+  assert.strictEqual(host.timer.durationSeconds, 5);
+  assert.strictEqual(screen.timer?.type, "answer", "таймер ответа виден на экране");
+  await waitFor(
+    () =>
+      host.currentQuestion?.status === "shown" &&
+      host.currentQuestion.result?.timedOut === true,
+    "время на ответ истекло",
+    9000
+  );
+  await waitFor(() => p1AgainState?.you?.isBlocked === true, "команда заблокирована по таймеру");
+  assert.strictEqual(host.currentQuestion.result.reason, "answer_timeout");
+  assert.strictEqual(host.currentQuestion.result.penalty, 0);
+  assert.strictEqual(screen.currentQuestion.answer, null, "ответ не раскрыт после ошибки");
+  ok("по истечении таймера ответ засчитывается неверным и команда блокируется");
+
+  /* ------------------ Ручная блокировка кнопок --------------------- */
+
+  assertOk(await emitAck(hostSocket, "newGame", {}), "Сброс перед проверкой блокировки");
+  await waitFor(() => host.phase === "lobby", "лобби перед проверкой блокировки");
+  assertOk(
+    await emitAck(hostSocket, "updateSettings", {
+      questionTimerEnabled: false,
+      answerTimerEnabled: false,
+      votingTimerEnabled: false,
+      manualBuzzControlEnabled: true
+    }),
+    "Ручная блокировка кнопок включена"
+  );
+
+  assertOk(await emitAck(hostSocket, "startGame", {}), "Старт с закрытыми кнопками");
+  await waitFor(() => host.phase === "themeSelect", "поле с закрытыми кнопками");
+  cell = firstUnplayed(host);
+  assertOk(await emitAck(hostSocket, "selectQuestion", { cellId: cell.id }), "Вопрос с закрытыми кнопками");
+  await waitFor(() => host.currentQuestion?.status === "selected", "Вопрос с закрытыми кнопками выбран");
+  assertOk(await emitAck(hostSocket, "showQuestion", {}), "Показать вопрос с закрытыми кнопками");
+  await waitFor(() => host.currentQuestion?.status === "shown", "Вопрос с закрытыми кнопками показан");
+  await waitFor(() => host.currentQuestion?.buzzLocked === true, "кнопки заблокированы");
+  assert.strictEqual(p1AgainState?.you?.canBuzz, false, "игрок не может нажать при блокировке");
+
+  const lockedBuzz = await emitAck(p1Again, "buzz", {});
+  assert.strictEqual(lockedBuzz.ok, false);
+  assert.strictEqual(lockedBuzz.code, "BUZZ_LOCKED");
+
+  assertOk(await emitAck(hostSocket, "unlockBuzz", {}), "Ведущий открыл кнопки");
+  await waitFor(() => host.currentQuestion?.buzzLocked === false, "кнопки открыты");
+  await waitFor(() => p1AgainState?.you?.canBuzz === true, "игрок снова может нажать");
+  assertOk(await emitAck(p1Again, "buzz", {}), "Нажатие после разрешения");
+  await waitFor(() => host.currentQuestion?.status === "buzzed", "нажатие после разрешения принято");
+  assertOk(await emitAck(hostSocket, "judgeAnswer", { correct: false }), "Ошибка после разрешения");
+  await waitFor(
+    () => host.currentQuestion?.status === "shown" && host.currentQuestion?.buzzLocked === true,
+    "кнопки снова закрыты после ошибки"
+  );
+  assert.strictEqual(p2State?.you?.canBuzz, false, "вторая команда ждёт ведущего");
+  assertOk(await emitAck(hostSocket, "unlockBuzz", {}), "Повторно открыть кнопки");
+  await waitFor(() => p2State?.you?.canBuzz === true, "вторая команда может нажать");
+  ok("ведущий вручную открывает кнопки после показа вопроса и после ошибки");
+
+  assertOk(await emitAck(hostSocket, "newGame", {}), "Сброс после проверки блокировки");
+  await waitFor(() => host.phase === "lobby", "лобби после проверки блокировки");
+  assertOk(
+    await emitAck(hostSocket, "updateSettings", { manualBuzzControlEnabled: false }),
+    "Ручная блокировка выключена"
+  );
 
   /* --------------------- Редактор и своя игра --------------------- */
 

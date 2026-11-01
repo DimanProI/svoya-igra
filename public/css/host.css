@@ -1135,6 +1135,34 @@ button.mini-cell:disabled {
   line-height: 1.4;
 }
 
+.ctl-answer-reveal {
+  margin: 8px 0 10px;
+  padding: 11px 13px;
+  border: 1px solid rgba(88, 226, 161, 0.34);
+  border-radius: 10px;
+  background:
+    linear-gradient(135deg, rgba(39, 119, 83, 0.2), rgba(16, 41, 31, 0.28));
+}
+
+.ctl-answer-reveal > span {
+  display: block;
+  color: #91e8bb;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ctl-answer-reveal > strong {
+  display: block;
+  margin-top: 4px;
+  color: #f4fff9;
+  font-size: 17px;
+  font-weight: 850;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
 .ctl-team-banner {
   display: flex;
   align-items: center;
@@ -1522,8 +1550,12 @@ button.mini-cell:disabled {
 }
 
 .settings-form {
+  max-height: min(34vh, 300px);
   padding: 0 14px 12px;
+  overflow-y: auto;
   border-top: 1px solid rgba(152, 174, 230, 0.08);
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .setting-row {

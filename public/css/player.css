@@ -1037,6 +1037,35 @@
   font-weight: 900;
 }
 
+.p-answer-reveal {
+  padding: 14px 15px;
+  border: 1px solid rgba(88, 226, 161, 0.34);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(33, 112, 80, 0.3), rgba(12, 37, 29, 0.36));
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+  animation: p-fade-in 0.3s ease both;
+}
+
+.p-answer-reveal > span {
+  display: block;
+  color: #8becb9;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.p-answer-reveal > strong {
+  display: block;
+  margin-top: 5px;
+  color: #f5fff9;
+  font-size: clamp(19px, 5.2vw, 25px);
+  font-weight: 850;
+  line-height: 1.32;
+  overflow-wrap: anywhere;
+}
+
 /* -------------------------- Голосование --------------------------- */
 
 .p-vote-card {

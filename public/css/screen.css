@@ -1148,8 +1148,10 @@
   justify-content: center;
   width: 100%;
   max-width: 1660px;
+  min-height: 0;
   margin: 0 auto;
   padding: clamp(12px, 2vh, 28px) 0;
+  overflow: hidden;
   text-align: center;
 }
 
@@ -1198,7 +1200,7 @@
 .question-text {
   max-height: 43vh;
   margin: 0;
-  overflow: auto;
+  overflow: hidden;
   color: #fbfdff;
   font-size: clamp(34px, 4.65vw, 92px);
   font-weight: 800;
@@ -1369,6 +1371,78 @@
 .next-answer .live-dot {
   background: var(--red);
   box-shadow: 0 0 0 4px rgba(255, 97, 125, 0.12);
+}
+
+.answer-lock-icon {
+  display: grid;
+  width: clamp(62px, 6vw, 104px);
+  height: clamp(62px, 6vw, 104px);
+  place-items: center;
+  border: 2px solid rgba(255, 202, 87, 0.3);
+  border-radius: 50%;
+  background: rgba(255, 202, 87, 0.07);
+  font-size: clamp(25px, 2.8vw, 48px);
+}
+
+.answer-reveal {
+  width: min(1240px, 92vw);
+  margin: 0 auto;
+  padding: clamp(14px, 2vh, 24px) clamp(22px, 3.5vw, 52px);
+  border: 1px solid rgba(88, 226, 161, 0.32);
+  border-radius: clamp(14px, 1.5vw, 24px);
+  background:
+    linear-gradient(135deg, rgba(35, 108, 78, 0.34), rgba(10, 28, 24, 0.48));
+  box-shadow:
+    0 0 60px rgba(37, 150, 103, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  text-align: center;
+  animation: answer-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.answer-reveal__eyebrow {
+  display: block;
+  color: #88efb8;
+  font-size: clamp(10px, 1vw, 17px);
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.answer-reveal__text {
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+  color: #f3fff9;
+  font-size: clamp(28px, 3.8vw, 72px);
+  font-weight: 850;
+  letter-spacing: -0.03em;
+  line-height: 1.16;
+  text-wrap: balance;
+}
+
+.answer-reveal__note {
+  margin-top: 7px;
+  color: rgba(199, 233, 216, 0.7);
+  font-size: clamp(10px, 0.95vw, 16px);
+}
+
+.result-inline + .answer-reveal {
+  margin-top: 10px;
+  padding: clamp(9px, 1.2vh, 15px) clamp(18px, 2.5vw, 34px);
+}
+
+.result-inline + .answer-reveal .answer-reveal__text {
+  font-size: clamp(21px, 2.3vw, 42px);
+}
+
+@keyframes answer-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .overlay-teams {

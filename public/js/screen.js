@@ -363,7 +363,14 @@ function sizeScreenBoard() {
 
 window.addEventListener("resize", () => {
   requestAnimationFrame(sizeScreenBoard);
+  requestAnimationFrame(fitQuestionText);
 });
+
+if (els.qImage) {
+  els.qImage.addEventListener("load", () => {
+    requestAnimationFrame(fitQuestionText);
+  });
+}
 
 function renderScoreboard() {
   els.scoreList.innerHTML = "";
@@ -492,7 +499,11 @@ function renderQuestionOverlay() {
       ? "Ответ"
       : question?.status === "result"
         ? "Результат"
-        : "Вопрос";
+        : question?.status === "revealed"
+          ? "Правильный ответ"
+          : question?.buzzLocked
+            ? "Кнопки закрыты"
+            : "Вопрос";
 
   if (voting) {
     els.votePanel.classList.remove("hidden");
@@ -505,6 +516,87 @@ function renderQuestionOverlay() {
   }
 
   updateTimerDisplay();
+  requestAnimationFrame(fitQuestionText);
+  setTimeout(fitQuestionText, 80);
+}
+
+function answerRevealHtml(question, { title = "Правильный ответ", note = "" } = {}) {
+  return `
+    <div class="answer-reveal">
+      <span class="answer-reveal__eyebrow">${SI.escapeHtml(title)}</span>
+      <div class="answer-reveal__text">${SI.escapeHtml(
+        question?.answer || "Ответ не указан"
+      )}</div>
+      ${note ? `<div class="answer-reveal__note">${SI.escapeHtml(note)}</div>` : ""}
+    </div>`;
+}
+
+function fitQuestionText() {
+  if (
+    !state ||
+    els.questionOverlay.classList.contains("hidden") ||
+    els.questionOverlay.classList.contains("is-voting")
+  ) {
+    return;
+  }
+  const text = els.qText;
+  if (!text || text.classList.contains("hidden")) return;
+
+  const wrap = text.closest(".question-text-wrap");
+  if (!wrap) return;
+
+  text.style.fontSize = "";
+  text.style.maxHeight = "";
+  text.style.overflow = "hidden";
+  els.qImage.style.removeProperty("max-height");
+
+  requestAnimationFrame(() => {
+    if (!state || els.questionOverlay.classList.contains("hidden")) return;
+    const wrapStyle = getComputedStyle(wrap);
+    const paddingY =
+      (Number.parseFloat(wrapStyle.paddingTop) || 0) +
+      (Number.parseFloat(wrapStyle.paddingBottom) || 0);
+    const kickerStyle = getComputedStyle(els.qKicker);
+    const kickerHeight =
+      els.qKicker.getBoundingClientRect().height +
+      (Number.parseFloat(kickerStyle.marginBottom) || 0);
+
+    const wrapHeight = wrap.clientHeight;
+    if (!wrapHeight) return;
+    let available = Math.max(90, wrapHeight - paddingY - kickerHeight - 10);
+    const imageVisible = !els.qImageWrap.classList.contains("hidden");
+
+    if (imageVisible) {
+      let imageHeight = els.qImageWrap.getBoundingClientRect().height;
+      const maxImageHeight = Math.max(100, available * 0.58);
+      if (imageHeight > maxImageHeight) {
+        els.qImage.style.maxHeight = `${Math.floor(maxImageHeight)}px`;
+        imageHeight = els.qImageWrap.getBoundingClientRect().height;
+      }
+      available = Math.max(80, available - imageHeight - 10);
+    }
+
+    const maxHeight = Math.max(60, available);
+    text.style.maxHeight = `${Math.floor(maxHeight)}px`;
+
+    let size = imageVisible
+      ? Math.min(window.innerWidth * 0.038, 58)
+      : Math.min(window.innerWidth * 0.047, 92);
+    const minSize = imageVisible ? 18 : 20;
+    text.style.fontSize = `${size}px`;
+
+    let guard = 0;
+    while (text.scrollHeight > maxHeight + 2 && size > minSize && guard < 50) {
+      size -= 2;
+      text.style.fontSize = `${size}px`;
+      guard += 1;
+    }
+
+    if (text.scrollHeight > maxHeight + 2) {
+      text.style.overflowY = "auto";
+      text.style.overflowX = "hidden";
+    }
+  });
 }
 
 function renderQuestionStatus(question) {
@@ -527,6 +619,14 @@ function renderQuestionStatus(question) {
         )}</strong>
         <span class="answer-plaque__note">Ведущий слушает ответ</span>
       </div>`;
+  } else if (question.status === "revealed") {
+    html = answerRevealHtml(question, {
+      title: "Правильный ответ",
+      note:
+        question.revealReason === "voting_pass"
+          ? "Вопрос закрыт голосованием"
+          : "Экран скоро вернётся к игровому полю"
+    });
   } else if (question.status === "result" && question.result?.correct) {
     html = `
       <div class="result-inline">
@@ -537,16 +637,28 @@ function renderQuestionStatus(question) {
           question.result.delta
         )}</span></span>
         <span class="result-inline__note">Счёт обновлён на табло</span>
-      </div>`;
+      </div>
+      ${answerRevealHtml(question, { title: "Правильный ответ" })}`;
   } else if (question.status === "shown" && question.result && !question.result.correct) {
     html = `
       <div class="next-answer">
         <span class="live-dot"></span>
-        <span>${SI.escapeHtml(question.result.teamName)} ошиблась${
-          question.result.penalty
-            ? ` · штраф −${SI.formatScore(question.result.penalty)}`
-            : ""
+        <span>${
+          question.result.timedOut
+            ? `Время на ответ истекло: ${SI.escapeHtml(question.result.teamName)}`
+            : `${SI.escapeHtml(question.result.teamName)} ошиблась${
+                question.result.penalty
+                  ? ` · штраф −${SI.formatScore(question.result.penalty)}`
+                  : ""
+              }`
         }. Кто следующий?</span>
+      </div>`;
+  } else if (question.buzzLocked) {
+    html = `
+      <div class="answer-call answer-call--locked">
+        <div class="answer-lock-icon">🔒</div>
+        <div class="answer-call__title">Кнопки ещё закрыты</div>
+        <div class="answer-call__hint">Ведущий откроет приём ответов</div>
       </div>`;
   } else {
     html = `
@@ -770,7 +882,7 @@ function updateTimerDisplay() {
   if (timer) {
     const seconds = Math.max(0, Math.ceil(remaining / 1000));
     els.headerTimerValue.textContent = String(seconds);
-    els.headerTimerLabel.textContent = "сек";
+    els.headerTimerLabel.textContent = timer.type === "answer" ? "на ответ" : "сек";
     els.headerTimer.classList.toggle("is-urgent", remaining <= 10000);
   }
 
@@ -778,11 +890,14 @@ function updateTimerDisplay() {
   if (timer && overlay) {
     const seconds = Math.max(0, Math.ceil(remaining / 1000));
     els.qTimerValue.textContent = String(seconds);
-    els.qTimerLabel.textContent = "сек";
+    els.qTimerLabel.textContent = timer.type === "answer" ? "на ответ" : "сек";
     els.qTimer.classList.toggle("is-urgent", remaining <= 10000);
-    els.voteTimerText.textContent = timer.type === "voting"
-      ? `До конца голосования: ${seconds} сек`
-      : `До конца вопроса: ${seconds} сек`;
+    els.voteTimerText.textContent =
+      timer.type === "voting"
+        ? `До конца голосования: ${seconds} сек`
+        : timer.type === "answer"
+          ? `Время на ответ: ${seconds} сек`
+          : `До конца вопроса: ${seconds} сек`;
 
     if (remaining <= 5000 && remaining > 0) {
       const second = Math.ceil(remaining / 1000);
@@ -825,14 +940,35 @@ function handleGameEvent(event) {
     case "wrong":
       playWrong();
       showEffect("wrong", {
-        title: "НЕВЕРНО!",
-        eyebrow: "Ответ не принят",
+        title: data.timedOut || data.reason === "answer_timeout" ? "ВРЕМЯ ВЫШЛО!" : "НЕВЕРНО!",
+        eyebrow:
+          data.timedOut || data.reason === "answer_timeout"
+            ? "Команда не успела ответить"
+            : "Ответ не принят",
         name: data.teamName,
         note: data.penalty
           ? `Штраф −${SI.formatScore(data.penalty)} · команда выбывает из вопроса`
           : "Команда ошибается и выбывает из вопроса",
         score: data.penalty ? `−${SI.formatScore(data.penalty)}` : ""
       });
+      break;
+
+    case "buzz:unlocked":
+      playResume();
+      showEffect(
+        "resume",
+        {
+          title: "КНОПКИ ОТКРЫТЫ",
+          eyebrow: "Ведущий разрешил ответ",
+          name: "Кто первый?",
+          note: "Можно нажимать «Ответить»"
+        },
+        1300
+      );
+      break;
+
+    case "question:reveal":
+      playPass();
       break;
 
     case "voting:start":
@@ -856,8 +992,10 @@ function handleGameEvent(event) {
         {
           title: "ИГРАЕМ ДАЛЬШЕ!",
           eyebrow: "Решение команд",
-          name: "Кнопки снова активны",
-          note: "Можно отвечать всем командам"
+          name: data.buzzLocked ? "Кнопки откроет ведущий" : "Кнопки снова активны",
+          note: data.buzzLocked
+            ? "Ведущий разрешит ответ на пульте"
+            : "Можно отвечать всем командам"
         },
         1900
       );
@@ -871,9 +1009,9 @@ function handleGameEvent(event) {
           title: "ПАС ВОПРОСА",
           eyebrow: "Решение команд",
           name: "Без баллов",
-          note: "Переходим к выбору следующей темы"
+          note: "Сейчас появится правильный ответ"
         },
-        2100
+        1700
       );
       break;
 

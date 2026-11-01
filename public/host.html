@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0b1020" />
     <title>Своя игра — пульт ведущего</title>
-    <link rel="stylesheet" href="/css/base.css?v=20261026-1" />
-    <link rel="stylesheet" href="/css/host.css?v=20261026-1" />
+    <link rel="stylesheet" href="/css/base.css?v=20261101-1" />
+    <link rel="stylesheet" href="/css/host.css?v=20261101-1" />
   </head>
   <body class="host-page">
     <div class="host-shell is-locked">
@@ -141,6 +141,17 @@
               </div>
               <div class="setting-row">
                 <label class="switch-label">
+                  <input type="checkbox" id="answerTimerEnabled" />
+                  <span class="switch"><i></i></span>
+                  <span>Таймер на ответ команды</span>
+                </label>
+                <label class="number-field">
+                  <span>Секунд</span>
+                  <input type="number" id="answerTimerSeconds" min="5" max="120" step="5" />
+                </label>
+              </div>
+              <div class="setting-row">
+                <label class="switch-label">
                   <input type="checkbox" id="votingTimerEnabled" />
                   <span class="switch"><i></i></span>
                   <span>Таймер голосования</span>
@@ -158,8 +169,16 @@
                 </label>
                 <span class="setting-note">Штраф = стоимость вопроса</span>
               </div>
+              <div class="setting-row setting-row--penalty">
+                <label class="switch-label">
+                  <input type="checkbox" id="manualBuzzControlEnabled" />
+                  <span class="switch"><i></i></span>
+                  <span>Кнопки открывает ведущий</span>
+                </label>
+                <span class="setting-note">После показа вопроса и после ошибки</span>
+              </div>
               <div class="settings-footer">
-                <p>Таймер вопроса перезапустится при сохранении.</p>
+                <p>Изменения таймеров применяются сразу.</p>
                 <button class="host-small-btn host-small-btn--accent" type="submit">
                   Сохранить
                 </button>
@@ -243,7 +262,7 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/js/common.js?v=20261026-1"></script>
-    <script src="/js/host.js?v=20261026-1"></script>
+    <script src="/js/common.js?v=20261101-1"></script>
+    <script src="/js/host.js?v=20261101-1"></script>
   </body>
 </html>

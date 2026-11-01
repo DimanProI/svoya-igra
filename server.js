@@ -195,9 +195,12 @@ function broadcastEditorState() {
 const DEFAULT_SETTINGS = Object.freeze({
   questionTimerEnabled: true,
   questionTimerSeconds: 60,
+  answerTimerEnabled: true,
+  answerTimerSeconds: 30,
   votingTimerEnabled: true,
   votingTimerSeconds: 15,
-  wrongAnswerPenaltyEnabled: false
+  wrongAnswerPenaltyEnabled: false,
+  manualBuzzControlEnabled: false
 });
 
 const game = {
@@ -216,7 +219,9 @@ const game = {
 
 const timers = {
   question: null,
+  answer: null,
   voting: null,
+  reveal: null,
   autoClose: null,
   autoVote: null
 };
@@ -442,9 +447,20 @@ function clearQuestionTimer() {
   if (game.currentQuestion) game.currentQuestion.timer = null;
 }
 
+function clearAnswerTimer() {
+  if (timers.answer) clearTimeout(timers.answer);
+  timers.answer = null;
+  if (game.currentQuestion) game.currentQuestion.answerTimer = null;
+}
+
 function clearVotingTimer() {
   if (timers.voting) clearTimeout(timers.voting);
   timers.voting = null;
+}
+
+function clearRevealTimer() {
+  if (timers.reveal) clearTimeout(timers.reveal);
+  timers.reveal = null;
 }
 
 function clearAutoClose() {
@@ -459,7 +475,9 @@ function clearAutoVote() {
 
 function clearAllTimers() {
   clearQuestionTimer();
+  clearAnswerTimer();
   clearVotingTimer();
+  clearRevealTimer();
   clearAutoClose();
   clearAutoVote();
 }
@@ -469,6 +487,7 @@ function armQuestionTimer() {
   const question = game.currentQuestion;
   if (!question || game.phase !== "question" || question.status !== "shown") return;
   if (!game.settings.questionTimerEnabled) return;
+  if (game.settings.manualBuzzControlEnabled && !question.buzzUnlocked) return;
 
   const durationMs = game.settings.questionTimerSeconds * 1000;
   const endsAt = Date.now() + durationMs;
@@ -489,6 +508,41 @@ function armQuestionTimer() {
       current.timer = null;
       startVotingInternal("timer");
       broadcast();
+    }
+  }, durationMs);
+}
+
+function armAnswerTimer() {
+  clearAnswerTimer();
+  const question = game.currentQuestion;
+  if (
+    !question ||
+    game.phase !== "question" ||
+    question.status !== "buzzed" ||
+    !question.buzzedTeamId ||
+    !game.settings.answerTimerEnabled
+  ) {
+    return;
+  }
+
+  const durationSeconds = game.settings.answerTimerSeconds;
+  const durationMs = durationSeconds * 1000;
+  const endsAt = Date.now() + durationMs;
+  question.answerTimer = { endsAt, durationSeconds };
+
+  timers.answer = setTimeout(() => {
+    timers.answer = null;
+    const current = game.currentQuestion;
+    if (
+      game.phase === "question" &&
+      current &&
+      current.status === "buzzed" &&
+      current.answerTimer?.endsAt === endsAt &&
+      current.buzzedTeamId
+    ) {
+      const teamId = current.buzzedTeamId;
+      current.answerTimer = null;
+      applyWrongAnswer(teamId, "answer_timeout");
     }
   }, durationMs);
 }
@@ -532,6 +586,14 @@ function timerView(now) {
       remainingMs: Math.max(0, game.voting.endsAt - now)
     };
   }
+  if (game.phase === "question" && game.currentQuestion?.answerTimer?.endsAt) {
+    return {
+      type: "answer",
+      endsAt: game.currentQuestion.answerTimer.endsAt,
+      durationSeconds: game.currentQuestion.answerTimer.durationSeconds,
+      remainingMs: Math.max(0, game.currentQuestion.answerTimer.endsAt - now)
+    };
+  }
   if (game.phase === "question" && game.currentQuestion?.timer?.endsAt) {
     return {
       type: "question",
@@ -547,7 +609,17 @@ function questionView(audience) {
   const question = game.currentQuestion;
   if (!question) return null;
 
-  const textVisible = question.status !== "selected";
+  const textVisible = audience === "host" || question.status !== "selected";
+  const answerVisible =
+    audience === "host" ||
+    question.status === "revealed" ||
+    (question.status === "result" && question.result?.correct);
+  const buzzLocked = Boolean(
+    question.status === "shown" &&
+      game.settings.manualBuzzControlEnabled &&
+      !question.buzzUnlocked
+  );
+
   return {
     cellId: question.cellId,
     theme: question.theme,
@@ -556,7 +628,10 @@ function questionView(audience) {
     text: textVisible ? question.text : null,
     imageUrl:
       question.imageUrl && (audience === "host" || textVisible) ? question.imageUrl : null,
-    answer: audience === "host" ? question.answer : null,
+    answer: answerVisible ? question.answer : null,
+    answerVisible,
+    buzzLocked,
+    buzzUnlocked: question.buzzUnlocked !== false,
     buzzedTeamId: question.buzzedTeamId || null,
     buzzedTeamName: question.buzzedTeamId
       ? findTeam(question.buzzedTeamId)?.name || null
@@ -566,8 +641,10 @@ function questionView(audience) {
       : null,
     blockedTeamIds: game.teams.filter((team) => team.blocked).map((team) => team.id),
     result: question.result || null,
+    revealReason: question.revealReason || null,
     selectedAt: question.selectedAt || null,
-    shownAt: question.shownAt || null
+    shownAt: question.shownAt || null,
+    revealedAt: question.revealedAt || null
   };
 }
 
@@ -690,7 +767,8 @@ function playerState(player, now = Date.now()) {
       game.phase === "question" &&
       question?.status === "shown" &&
       !team.blocked &&
-      onlineCount(team) > 0
+      onlineCount(team) > 0 &&
+      (!game.settings.manualBuzzControlEnabled || question.buzzUnlocked)
   );
 
   return {
@@ -765,6 +843,7 @@ function startVotingInternal(reason = "host") {
   if (!["shown", "buzzed"].includes(game.currentQuestion.status)) return false;
 
   clearQuestionTimer();
+  clearAnswerTimer();
   clearAutoVote();
   clearAutoClose();
 
@@ -773,6 +852,7 @@ function startVotingInternal(reason = "host") {
   game.currentQuestion.buzzedTeamId = null;
   game.currentQuestion.buzzAt = null;
   game.currentQuestion.timer = null;
+  game.currentQuestion.answerTimer = null;
   game.votes.clear();
 
   const durationSeconds = game.settings.votingTimerSeconds;
@@ -799,9 +879,147 @@ function startVotingInternal(reason = "host") {
   return true;
 }
 
+function applyWrongAnswer(teamId, reason = "host") {
+  if (game.phase !== "question" || !game.currentQuestion) return null;
+  const question = game.currentQuestion;
+  if (question.status !== "buzzed" || !question.buzzedTeamId) return null;
+
+  const team = findTeam(teamId || question.buzzedTeamId);
+  if (!team) return null;
+
+  clearQuestionTimer();
+  clearAnswerTimer();
+  clearAutoVote();
+  clearAutoClose();
+
+  const penalty = game.settings.wrongAnswerPenaltyEnabled ? question.value : 0;
+  if (penalty) team.score -= penalty;
+
+  team.blocked = true;
+  question.status = "shown";
+  question.buzzedTeamId = null;
+  question.buzzAt = null;
+  question.answerTimer = null;
+  question.buzzUnlocked = !game.settings.manualBuzzControlEnabled;
+  question.result = {
+    correct: false,
+    type: "wrong",
+    reason,
+    timedOut: reason === "answer_timeout",
+    teamId: team.id,
+    teamName: team.name,
+    teamColor: team.color,
+    penalty,
+    score: team.score,
+    at: Date.now()
+  };
+
+  setEvent("wrong", {
+    teamId: team.id,
+    teamName: team.name,
+    teamColor: team.color,
+    theme: question.theme,
+    value: question.value,
+    penalty,
+    score: team.score,
+    reason,
+    timedOut: reason === "answer_timeout"
+  });
+
+  const online = onlineTeams();
+  const remaining = online.filter((item) => !item.blocked);
+  if (online.length > 0 && remaining.length === 0) {
+    clearQuestionTimer();
+    timers.autoVote = setTimeout(() => {
+      timers.autoVote = null;
+      if (
+        game.phase === "question" &&
+        game.currentQuestion?.status === "shown" &&
+        onlineTeams().length > 0 &&
+        onlineTeams().every((item) => item.blocked)
+      ) {
+        startVotingInternal("all-failed");
+        broadcast();
+      }
+    }, 2400);
+  } else if (!game.settings.manualBuzzControlEnabled) {
+    armQuestionTimer();
+  }
+
+  broadcast();
+  return { team, penalty };
+}
+
+function beginAnswerReveal({
+  reason = "host_closed",
+  eventType = "question:reveal",
+  eventData = {}
+}) {
+  if (game.phase !== "question" && game.phase !== "voting") return false;
+  const question = game.currentQuestion;
+  if (!question || question.status === "selected" || question.status === "revealed") {
+    return false;
+  }
+
+  clearQuestionTimer();
+  clearAnswerTimer();
+  clearVotingTimer();
+  clearAutoVote();
+  clearAutoClose();
+
+  markCurrentCellPlayed();
+  resetBlocks();
+  question.status = "revealed";
+  question.buzzedTeamId = null;
+  question.buzzAt = null;
+  question.timer = null;
+  question.answerTimer = null;
+  question.revealedAt = Date.now();
+  question.revealReason = reason;
+  if (!question.result || question.result.correct !== true) {
+    question.result = {
+      correct: false,
+      type: "revealed",
+      reason,
+      at: Date.now()
+    };
+  }
+
+  game.phase = "question";
+  game.voting = null;
+  game.votes.clear();
+
+  setEvent(eventType, {
+    ...eventData,
+    answer: question.answer,
+    reason,
+    theme: question.theme,
+    value: question.value
+  });
+
+  clearRevealTimer();
+  timers.reveal = setTimeout(() => {
+    timers.reveal = null;
+    if (
+      game.phase === "question" &&
+      game.currentQuestion?.status === "revealed"
+    ) {
+      completeQuestion({
+        eventType: "question:close",
+        eventData: { reason: "reveal_timeout" }
+      });
+    }
+  }, 6500);
+
+  broadcast();
+  return true;
+}
+
 function completeQuestion({ eventType, eventData = {} }) {
   clearQuestionTimer();
+  clearAnswerTimer();
   clearVotingTimer();
+  clearRevealTimer();
   clearAutoClose();
   clearAutoVote();
 
@@ -853,24 +1071,32 @@ function applyVotingOutcome(outcome, source) {
     game.currentQuestion.buzzedTeamId = null;
     game.currentQuestion.buzzAt = null;
     game.currentQuestion.result = null;
+    game.currentQuestion.answerTimer = null;
+    game.currentQuestion.buzzUnlocked = !game.settings.manualBuzzControlEnabled;
     game.votes.clear();
     resetBlocks();
     game.voting = null;
-    armQuestionTimer();
+    if (game.settings.manualBuzzControlEnabled) {
+      clearQuestionTimer();
+    } else {
+      armQuestionTimer();
+    }
     setEvent("voting:resume", {
       outcome,
       source,
       counts,
       details,
       questionTheme,
-      questionValue
+      questionValue,
+      buzzLocked: Boolean(game.settings.manualBuzzControlEnabled)
     });
     broadcast();
     return true;
   }
 
   game.voting = null;
-  completeQuestion({
+  beginAnswerReveal({
+    reason: "voting_pass",
     eventType: "voting:pass",
     eventData: {
       outcome: "pass",
@@ -891,7 +1117,8 @@ function finishQuestionAsPass(source = "host") {
 
   const questionTheme = game.currentQuestion.theme;
   const questionValue = game.currentQuestion.value;
-  completeQuestion({
+  beginAnswerReveal({
+    reason: "skip",
     eventType: "voting:pass",
     eventData: {
       outcome: "pass",
@@ -907,7 +1134,9 @@ function finishQuestionAsPass(source = "host") {
 
 function cancelSelectedQuestion() {
   clearQuestionTimer();
+  clearAnswerTimer();
   clearVotingTimer();
+  clearRevealTimer();
   clearAutoClose();
   clearAutoVote();
   const question = game.currentQuestion;
@@ -1409,14 +1638,51 @@ io.on("connection", (socket) => {
     game.currentQuestion.status = "shown";
     game.currentQuestion.shownAt = Date.now();
     game.currentQuestion.result = null;
+    game.currentQuestion.buzzUnlocked = !game.settings.manualBuzzControlEnabled;
+    game.currentQuestion.answerTimer = null;
     resetBlocks();
-    armQuestionTimer();
+    if (game.settings.manualBuzzControlEnabled) {
+      clearQuestionTimer();
+    } else {
+      armQuestionTimer();
+    }
     setEvent("question:show", {
       theme: game.currentQuestion.theme,
       value: game.currentQuestion.value,
-      durationSeconds: game.settings.questionTimerEnabled
-        ? game.settings.questionTimerSeconds
-        : 0
+      buzzLocked: Boolean(game.settings.manualBuzzControlEnabled),
+      durationSeconds:
+        game.settings.questionTimerEnabled && !game.settings.manualBuzzControlEnabled
+          ? game.settings.questionTimerSeconds
+          : 0
+    });
+    reply(ack, { ok: true });
+    broadcast();
+  });
+
+  socket.on("unlockBuzz", (_payload, ack) => {
+    if (!hostOnly(ack)) return;
+    if (game.phase !== "question" || !game.currentQuestion) {
+      reply(ack, { ok: false, error: "Сейчас нет открытого вопроса." });
+      return;
+    }
+    if (game.currentQuestion.status !== "shown") {
+      reply(ack, { ok: false, error: "Кнопки открываются только до нажатия команды." });
+      return;
+    }
+    if (!game.settings.manualBuzzControlEnabled) {
+      reply(ack, { ok: false, error: "Ручная блокировка кнопок выключена в настройках." });
+      return;
+    }
+    if (game.currentQuestion.buzzUnlocked) {
+      reply(ack, { ok: false, error: "Кнопки уже открыты." });
+      return;
+    }
+
+    game.currentQuestion.buzzUnlocked = true;
+    armQuestionTimer();
+    setEvent("buzz:unlocked", {
+      theme: game.currentQuestion.theme,
+      value: game.currentQuestion.value
     });
     reply(ack, { ok: true });
     broadcast();
@@ -1446,6 +1712,17 @@ io.on("connection", (socket) => {
       });
       return;
     }
+    if (
+      game.settings.manualBuzzControlEnabled &&
+      !game.currentQuestion.buzzUnlocked
+    ) {
+      reply(ack, {
+        ok: false,
+        code: "BUZZ_LOCKED",
+        error: "Ведущий ещё не открыл кнопки."
+      });
+      return;
+    }
     if (team.blocked) {
       reply(ack, {
         ok: false,
@@ -1461,18 +1738,22 @@ io.on("connection", (socket) => {
 
     clearQuestionTimer();
     clearAutoVote();
+    clearAnswerTimer();
     game.currentQuestion.status = "buzzed";
     game.currentQuestion.buzzedTeamId = team.id;
     game.currentQuestion.buzzAt = Date.now();
     game.currentQuestion.buzzedByPlayerId = player.id;
     game.currentQuestion.result = null;
+    armAnswerTimer();
     setEvent("buzz", {
       teamId: team.id,
       teamName: team.name,
       teamColor: team.color,
       playerName: player.name,
       theme: game.currentQuestion.theme,
-      value: game.currentQuestion.value
+      value: game.currentQuestion.value,
+      answerTimerEnabled: game.settings.answerTimerEnabled,
+      answerTimerSeconds: game.settings.answerTimerSeconds
     });
     reply(ack, { ok: true, teamId: team.id });
     broadcast();
@@ -1494,11 +1775,12 @@ io.on("connection", (socket) => {
       return;
     }
 
-    clearQuestionTimer();
-    clearAutoVote();
-    clearAutoClose();
-
     if (payload.correct === true) {
+      clearQuestionTimer();
+      clearAnswerTimer();
+      clearAutoVote();
+      clearAutoClose();
+
       team.score += game.currentQuestion.value;
       game.currentQuestion.status = "result";
       game.currentQuestion.result = {
@@ -1512,6 +1794,9 @@ io.on("connection", (socket) => {
         at: Date.now()
       };
       game.currentQuestion.buzzedTeamId = null;
+      game.currentQuestion.buzzAt = null;
+      game.currentQuestion.answerTimer = null;
+      game.currentQuestion.buzzUnlocked = false;
       markCurrentCellPlayed();
       setEvent("correct", {
         teamId: team.id,
@@ -1520,7 +1805,8 @@ io.on("connection", (socket) => {
         delta: game.currentQuestion.value,
         score: team.score,
         theme: game.currentQuestion.theme,
-        value: game.currentQuestion.value
+        value: game.currentQuestion.value,
+        answer: game.currentQuestion.answer
       });
 
       timers.autoClose = setTimeout(() => {
@@ -1531,60 +1817,18 @@ io.on("connection", (socket) => {
             eventData: { reason: "correct" }
           });
         }
-      }, 3800);
-    } else {
-      const penalty = game.settings.wrongAnswerPenaltyEnabled
-        ? game.currentQuestion.value
-        : 0;
-      if (penalty) team.score -= penalty;
-
-      team.blocked = true;
-      game.currentQuestion.status = "shown";
-      game.currentQuestion.buzzedTeamId = null;
-      game.currentQuestion.buzzAt = null;
-      game.currentQuestion.result = {
-        correct: false,
-        type: "wrong",
-        teamId: team.id,
-        teamName: team.name,
-        teamColor: team.color,
-        penalty,
-        score: team.score,
-        at: Date.now()
-      };
-      setEvent("wrong", {
-        teamId: team.id,
-        teamName: team.name,
-        teamColor: team.color,
-        theme: game.currentQuestion.theme,
-        value: game.currentQuestion.value,
-        penalty,
-        score: team.score
-      });
-
-      const online = onlineTeams();
-      const remaining = online.filter((item) => !item.blocked);
-      if (online.length > 0 && remaining.length === 0) {
-        clearQuestionTimer();
-        timers.autoVote = setTimeout(() => {
-          timers.autoVote = null;
-          if (
-            game.phase === "question" &&
-            game.currentQuestion?.status === "shown" &&
-            onlineTeams().length > 0 &&
-            onlineTeams().every((item) => item.blocked)
-          ) {
-            startVotingInternal("all-failed");
-            broadcast();
-          }
-        }, 2400);
-      } else {
-        armQuestionTimer();
-      }
+      }, 6500);
+      reply(ack, { ok: true });
+      broadcast();
+      return;
     }
 
+    const result = applyWrongAnswer(team.id, "host");
+    if (!result) {
+      reply(ack, { ok: false, error: "Не удалось зафиксировать неверный ответ." });
+      return;
+    }
     reply(ack, { ok: true });
-    broadcast();
   });
 
   socket.on("startVoting", (_payload, ack) => {
@@ -1697,13 +1941,24 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const info = {
-      reason: "host",
-      theme: game.currentQuestion.theme,
-      value: game.currentQuestion.value
-    };
-    completeQuestion({ eventType: "question:close", eventData: info });
-    reply(ack, { ok: true });
+    if (
+      game.currentQuestion.status === "revealed" ||
+      game.currentQuestion.status === "result"
+    ) {
+      completeQuestion({
+        eventType: "question:close",
+        eventData: { reason: "host" }
+      });
+      reply(ack, { ok: true });
+      return;
+    }
+
+    beginAnswerReveal({
+      reason: "host_closed",
+      eventType: "question:reveal",
+      eventData: { source: "host" }
+    });
+    reply(ack, { ok: true, revealed: true });
   });
 
   socket.on("nextSelector", (_payload, ack) => {
@@ -1793,37 +2048,74 @@ io.on("connection", (socket) => {
   socket.on("updateSettings", (payload = {}, ack) => {
     if (!hostOnly(ack)) return;
 
+    const previous = game.settings;
     const next = {
       questionTimerEnabled:
         typeof payload.questionTimerEnabled === "boolean"
           ? payload.questionTimerEnabled
-          : game.settings.questionTimerEnabled,
+          : previous.questionTimerEnabled,
       questionTimerSeconds: clampInt(
         payload.questionTimerSeconds,
         5,
         300,
-        game.settings.questionTimerSeconds
+        previous.questionTimerSeconds
+      ),
+      answerTimerEnabled:
+        typeof payload.answerTimerEnabled === "boolean"
+          ? payload.answerTimerEnabled
+          : previous.answerTimerEnabled,
+      answerTimerSeconds: clampInt(
+        payload.answerTimerSeconds,
+        5,
+        120,
+        previous.answerTimerSeconds
       ),
       votingTimerEnabled:
         typeof payload.votingTimerEnabled === "boolean"
           ? payload.votingTimerEnabled
-          : game.settings.votingTimerEnabled,
+          : previous.votingTimerEnabled,
       votingTimerSeconds: clampInt(
         payload.votingTimerSeconds,
         5,
         120,
-        game.settings.votingTimerSeconds
+        previous.votingTimerSeconds
       ),
       wrongAnswerPenaltyEnabled:
         typeof payload.wrongAnswerPenaltyEnabled === "boolean"
           ? payload.wrongAnswerPenaltyEnabled
-          : game.settings.wrongAnswerPenaltyEnabled
+          : previous.wrongAnswerPenaltyEnabled,
+      manualBuzzControlEnabled:
+        typeof payload.manualBuzzControlEnabled === "boolean"
+          ? payload.manualBuzzControlEnabled
+          : previous.manualBuzzControlEnabled
     };
 
     game.settings = next;
 
-    if (game.phase === "question" && game.currentQuestion?.status === "shown") {
-      armQuestionTimer();
+    if (game.phase === "question" && game.currentQuestion) {
+      const question = game.currentQuestion;
+      if (question.status === "shown") {
+        if (
+          previous.manualBuzzControlEnabled !== next.manualBuzzControlEnabled
+        ) {
+          question.buzzUnlocked = !next.manualBuzzControlEnabled;
+        }
+        if (next.manualBuzzControlEnabled && !question.buzzUnlocked) {
+          clearQuestionTimer();
+        } else {
+          armQuestionTimer();
+        }
+      } else if (
+        question.status === "buzzed" &&
+        (previous.answerTimerEnabled !== next.answerTimerEnabled ||
+          previous.answerTimerSeconds !== next.answerTimerSeconds)
+      ) {
+        if (next.answerTimerEnabled) {
+          armAnswerTimer();
+        } else {
+          clearAnswerTimer();
+        }
+      }
     }
 
     setEvent("settings:update", { settings: { ...game.settings } });
