@@ -900,7 +900,6 @@ function applyWrongAnswer(teamId, reason = "host") {
   question.buzzedTeamId = null;
   question.buzzAt = null;
   question.answerTimer = null;
-  question.buzzUnlocked = !game.settings.manualBuzzControlEnabled;
   question.result = {
     correct: false,
     type: "wrong",
@@ -942,7 +941,7 @@ function applyWrongAnswer(teamId, reason = "host") {
         broadcast();
       }
     }, 2400);
-  } else if (!game.settings.manualBuzzControlEnabled) {
+  } else {
     armQuestionTimer();
   }
 

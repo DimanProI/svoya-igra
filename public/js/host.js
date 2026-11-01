@@ -457,8 +457,8 @@ function renderTeams() {
     minus.className = "host-score-button host-score-button--minus";
     minus.dataset.action = "adjust-score";
     minus.dataset.teamId = team.id;
-    minus.dataset.delta = "-100";
-    minus.title = "Снять 100 баллов";
+    minus.dataset.delta = "-50";
+    minus.title = "Снять 50 баллов";
     minus.textContent = "−";
 
     const plus = document.createElement("button");
@@ -466,8 +466,8 @@ function renderTeams() {
     plus.className = "host-score-button";
     plus.dataset.action = "adjust-score";
     plus.dataset.teamId = team.id;
-    plus.dataset.delta = "100";
-    plus.title = "Начислить 100 баллов";
+    plus.dataset.delta = "50";
+    plus.title = "Начислить 50 баллов";
     plus.textContent = "+";
 
     buttons.append(minus, plus);

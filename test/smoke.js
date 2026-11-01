@@ -412,12 +412,12 @@ async function main() {
   const alpha = teamByName(host, alphaName);
   const beforeAdjust = alpha.score;
   assertOk(
-    await emitAck(hostSocket, "adjustScore", { teamId: alpha.id, delta: -100 }),
+    await emitAck(hostSocket, "adjustScore", { teamId: alpha.id, delta: -50 }),
     "Снять баллы"
   );
-  await waitFor(() => teamByName(host, alphaName).score === beforeAdjust - 100, "счёт уменьшен");
+  await waitFor(() => teamByName(host, alphaName).score === beforeAdjust - 50, "счёт уменьшен");
   assertOk(
-    await emitAck(hostSocket, "adjustScore", { teamId: alpha.id, delta: 100 }),
+    await emitAck(hostSocket, "adjustScore", { teamId: alpha.id, delta: 50 }),
     "Начислить баллы"
   );
   await waitFor(() => teamByName(host, alphaName).score === beforeAdjust, "счёт восстановлен");
@@ -667,13 +667,11 @@ async function main() {
   await waitFor(() => host.currentQuestion?.status === "buzzed", "нажатие после разрешения принято");
   assertOk(await emitAck(hostSocket, "judgeAnswer", { correct: false }), "Ошибка после разрешения");
   await waitFor(
-    () => host.currentQuestion?.status === "shown" && host.currentQuestion?.buzzLocked === true,
-    "кнопки снова закрыты после ошибки"
+    () => host.currentQuestion?.status === "shown" && host.currentQuestion?.buzzLocked === false,
+    "кнопки остались открыты после ошибки"
   );
-  assert.strictEqual(p2State?.you?.canBuzz, false, "вторая команда ждёт ведущего");
-  assertOk(await emitAck(hostSocket, "unlockBuzz", {}), "Повторно открыть кнопки");
-  await waitFor(() => p2State?.you?.canBuzz === true, "вторая команда может нажать");
-  ok("ведущий вручную открывает кнопки после показа вопроса и после ошибки");
+  await waitFor(() => p2State?.you?.canBuzz === true, "вторая команда может нажать без нового разрешения");
+  ok("после ошибки кнопки остаются открытыми, если ведущий уже разрешил ответ");
 
   assertOk(await emitAck(hostSocket, "newGame", {}), "Сброс после проверки блокировки");
   await waitFor(() => host.phase === "lobby", "лобби после проверки блокировки");

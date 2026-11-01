@@ -45,7 +45,7 @@
 - Блокировка ошибившихся команд до конца вопроса.
 - Голосование за пас с подсчётом голосов в реальном времени.
 - Таймеры вопроса, ответа команды и голосования.
-- Ручное открытие кнопок ведущим: кнопки закрыты до команды «Разрешить ответы».
+- Ручное открытие кнопок ведущим: кнопки закрыты до команды «Разрешить ответы» и остаются открытыми до конца вопроса.
 - Показ правильного ответа после верного ответа и после паса/пропуска вопроса.
 - Автоподгонка размера шрифта для длинных вопросов — без прокрутки на большом экране.
 - Настройка штрафа за неверный ответ.
@@ -236,7 +236,7 @@ npm start
 
 Дополнительно на пульте доступны:
 
-- начисление и снятие 100 баллов вручную;
+- начисление и снятие 50 баллов вручную;
 - передача выбора следующей команде;
 - исключение игроков и команд из лобби;
 - выбор игрового набора;
@@ -412,7 +412,7 @@ A complete local prototype of a Jeopardy-style quiz game for one host computer a
 - Wrong teams are locked until the end of the question.
 - Real-time pass voting.
 - Question, team-answer and voting timers.
-- Host-controlled buzz unlocking: buttons stay locked until “Allow answers”.
+- Host-controlled buzz unlocking: buttons stay locked until “Allow answers” and remain unlocked for the rest of the question.
 - The correct answer is revealed after a correct answer and after a pass/skip.
 - Automatic font fitting for long questions — no scrolling on the big screen.
 - Optional score penalty for a wrong answer.
@@ -510,7 +510,7 @@ The host can remove a single player with the `×` button next to their name or r
 - Voting timer: on/off and duration.
 - Wrong-answer penalty: subtract the question value on a wrong answer.
 - Host-controlled buzz lock: buttons stay locked until the host allows answers.
-- Manual score adjustment: ±100 points.
+- Manual score adjustment: ±50 points.
 - Remove individual players or entire teams from the lobby.
 - Next selector, game set selection, JSON import, new game.
 
